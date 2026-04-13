@@ -1,0 +1,69 @@
+# =============================================================================
+# Depth Camera Configuration
+# =============================================================================
+# Everything runs on the Pi. No VPS, no cloud compute.
+
+camera:
+  # Aqara G5 Pro RTSP URL (LAN IP — Pi is on the same network).
+  # Find in: Aqara App → Camera → Settings → RTSP
+  # Use 1520p — ring buffer uses -c copy so resolution has zero CPU impact.
+  rtsp_url: "rtsp://USER:PASS@192.168.1.100:8554/1520p"
+  rtsp_transport: "tcp"
+
+ring_buffer:
+  # Continuous RTSP recording to circular segment files.
+  # Near-zero CPU. ~8-16 MB in /tmp (RAM-backed).
+  dir: "/tmp/depth-ring"
+  segment_seconds: 2
+  segment_count: 8           # 8 × 2s = 16 seconds of history
+  stale_timeout: 15
+  restart_delay: 3
+
+relay:
+  # IFTTT webhook receiver
+  host: "0.0.0.0"
+  port: 9090
+  lookback_s: 5              # Seconds into the past for IFTTT triggers
+  snapshot_quality: 2        # ffmpeg -q:v (1=best, 31=worst)
+
+detection:
+  # Local motion monitor (optional fallback)
+  poll_interval: 3
+  compare_width: 320
+  compare_height: 240
+  threshold: 20
+  min_changed_pct: 5.0
+  cooldown: 30
+  confirm_frames: 2
+  lookback_s: 2              # Shorter than IFTTT (local is faster)
+  snapshot_quality: 2
+
+pipeline:
+  # Depth processing settings
+  data_dir: "/data/depth-camera"
+  max_events: 200
+
+  # Point cloud downsampling: 1=full (~31MB), 2=quarter (~8MB), 4=sixteenth (~2MB)
+  ply_downsample: 2
+
+  # Model input resolution: 518 (default, best quality) or 384 (~40% faster)
+  depth_input_size: 518
+
+  # Depth visualization colormap: inferno, viridis, magma, turbo
+  colormap: "inferno"
+
+depth_model:
+  # Path to the Depth Anything V2 Small ONNX model.
+  # Downloaded automatically on first run if not present.
+  path: "~/.cache/depth-camera/depth_anything_v2_vits.onnx"
+  # url: "https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/onnx/model.onnx"
+
+gallery:
+  # Local web gallery
+  host: "0.0.0.0"
+  port: 8080
+
+logging:
+  level: "INFO"
+  save_debug_frames: false
+  debug_dir: "/tmp/depth-monitor-debug"

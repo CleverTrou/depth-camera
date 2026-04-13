@@ -1,0 +1,14 @@
+# Depth Camera — Python dependencies
+# All run on Raspberry Pi 5 (ARM64, no GPU)
+
+flask>=3.0
+pyyaml>=6.0
+requests>=2.31
+
+# Depth estimation
+onnxruntime>=1.17          # Has ARM64 (aarch64) wheels on PyPI
+numpy>=1.26
+Pillow>=10.0
+
+# Depth colormap visualization (optional — graceful fallback to grayscale)
+matplotlib>=3.8

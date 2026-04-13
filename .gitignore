@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+venv/
+.venv/
+
+# Runtime data
+/data/
+*.npy
+*.ply
+
+# Model files (large, downloaded on first run)
+*.onnx
+
+# Debug output
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>{{ event_id }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; overflow: hidden; touch-action: none; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+
+        .overlay {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            padding: 16px 20px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.85));
+            display: flex; align-items: flex-end; justify-content: space-between;
+            pointer-events: none;
+            opacity: 1; transition: opacity 0.5s;
+        }
+        .overlay.hidden { opacity: 0; }
+        .overlay * { pointer-events: auto; }
+        .event-label {
+            font-family: "SF Mono", monospace; font-size: 0.75rem;
+            color: rgba(255,255,255,0.5);
+        }
+        .overlay-actions { display: flex; gap: 8px; }
+        .btn {
+            padding: 8px 14px; border-radius: 8px; font-size: 0.8rem;
+            text-decoration: none; font-weight: 500; font-family: -apple-system, system-ui, sans-serif;
+        }
+        .btn-back { background: rgba(255,255,255,0.1); color: #ccc; }
+        .btn-ply { background: rgba(29,78,216,0.8); color: #fff; }
+
+        .gyro-prompt {
+            position: fixed; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.7); z-index: 10;
+            font-family: -apple-system, system-ui, sans-serif;
+            color: #fff; font-size: 1.1rem;
+        }
+        .gyro-prompt span {
+            background: rgba(255,255,255,0.1); padding: 20px 32px;
+            border-radius: 16px; text-align: center; line-height: 1.6;
+        }
+        .gyro-prompt.hidden { display: none; }
+
+        .no-webgl {
+            color: #fff; padding: 40px;
+            font-family: -apple-system, system-ui, sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+
+    <div class="overlay" id="overlay">
+        <div class="event-label">{{ event_id }}</div>
+        <div class="overlay-actions">
+            <a href="/" class="btn btn-back">&larr; Gallery</a>
+            <a href="/events/{{ event_id }}/pointcloud.ply" class="btn btn-ply">Download PLY</a>
+        </div>
+    </div>
+
+    <div class="gyro-prompt hidden" id="gyroPrompt">
+        <span>Tap to enable<br>gyroscope control</span>
+    </div>
+
+    <script>
+    (function() {
+        var canvas = document.getElementById('canvas');
+        var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) {
+            var msg = document.createElement('p');
+            msg.className = 'no-webgl';
+            msg.textContent = 'WebGL not supported in this browser.';
+            document.body.appendChild(msg);
+            return;
+        }
+
+        // --- Shader sources ---
+        var vsSource = [
+            'attribute vec2 a_pos;',
+            'attribute vec2 a_uv;',
+            'varying vec2 v_uv;',
+            'void main() {',
+            '  gl_Position = vec4(a_pos, 0.0, 1.0);',
+            '  v_uv = a_uv;',
+            '}'
+        ].join('\n');
+
+        var fsSource = [
+            'precision mediump float;',
+            'uniform sampler2D u_rgb;',
+            'uniform sampler2D u_depth;',
+            'uniform vec2 u_offset;',
+            'uniform float u_strength;',
+            'varying vec2 v_uv;',
+            'void main() {',
+            // Sample depth: red channel of the inferno colormap.
+            // Inferno maps near (bright/warm) to high R, far (dark/cool) to low R.
+            '  float d = texture2D(u_depth, v_uv).r;',
+            // Displace UV: near objects (high d) shift more, creating parallax.
+            '  vec2 disp = u_offset * d * u_strength;',
+            '  vec2 uv = clamp(v_uv - disp, 0.0, 1.0);',
+            '  gl_FragColor = texture2D(u_rgb, uv);',
+            '}'
+        ].join('\n');
+
+        // --- Compile shaders ---
+        function compileShader(src, type) {
+            var s = gl.createShader(type);
+            gl.shaderSource(s, src);
+            gl.compileShader(s);
+            return s;
+        }
+        var vs = compileShader(vsSource, gl.VERTEX_SHADER);
+        var fs = compileShader(fsSource, gl.FRAGMENT_SHADER);
+        var prog = gl.createProgram();
+        gl.attachShader(prog, vs);
+        gl.attachShader(prog, fs);
+        gl.linkProgram(prog);
+        gl.useProgram(prog);
+
+        // --- Fullscreen quad (positions + UVs interleaved) ---
+        var verts = new Float32Array([
+            -1, -1,  0, 1,
+             1, -1,  1, 1,
+            -1,  1,  0, 0,
+             1,  1,  1, 0,
+        ]);
+        var buf = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+
+        var aPos = gl.getAttribLocation(prog, 'a_pos');
+        gl.enableVertexAttribArray(aPos);
+        gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 16, 0);
+
+        var aUV = gl.getAttribLocation(prog, 'a_uv');
+        gl.enableVertexAttribArray(aUV);
+        gl.vertexAttribPointer(aUV, 2, gl.FLOAT, false, 16, 8);
+
+        var uRgb = gl.getUniformLocation(prog, 'u_rgb');
+        var uDepth = gl.getUniformLocation(prog, 'u_depth');
+        var uOffset = gl.getUniformLocation(prog, 'u_offset');
+        var uStrength = gl.getUniformLocation(prog, 'u_strength');
+
+        gl.uniform1i(uRgb, 0);
+        gl.uniform1i(uDepth, 1);
+        gl.uniform1f(uStrength, 0.04);
+
+        // --- Load textures ---
+        var loaded = 0;
+        function onLoad() { loaded++; if (loaded >= 2) render(); }
+
+        function loadTex(unit, url) {
+            var tex = gl.createTexture();
+            var img = new Image();
+            img.crossOrigin = '';
+            img.onload = function() {
+                gl.activeTexture(gl.TEXTURE0 + unit);
+                gl.bindTexture(gl.TEXTURE_2D, tex);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                onLoad();
+            };
+            img.src = url;
+        }
+
+        loadTex(0, '/events/{{ event_id }}/snapshot.jpg');
+        loadTex(1, '/events/{{ event_id }}/depth_colormap.jpg');
+
+        // --- Input: mouse (desktop) ---
+        var offsetX = 0, offsetY = 0;
+        var targetX = 0, targetY = 0;
+
+        canvas.addEventListener('mousemove', function(e) {
+            targetX = (e.clientX / window.innerWidth - 0.5) * 2;
+            targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+        });
+        canvas.addEventListener('mouseleave', function() {
+            targetX = 0; targetY = 0;
+        });
+
+        // --- Input: touch (mobile fallback) ---
+        canvas.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+            var t = e.touches[0];
+            targetX = (t.clientX / window.innerWidth - 0.5) * 2;
+            targetY = (t.clientY / window.innerHeight - 0.5) * 2;
+        }, { passive: false });
+        canvas.addEventListener('touchend', function() {
+            targetX = 0; targetY = 0;
+        });
+
+        // --- Input: gyroscope (iPhone) ---
+        function onOrientation(e) {
+            if (e.gamma === null) return;
+            targetX = Math.max(-1, Math.min(1, e.gamma / 30));
+            targetY = Math.max(-1, Math.min(1, (e.beta - 45) / 30));
+        }
+
+        // iOS 13+ requires user gesture for gyroscope permission
+        var prompt = document.getElementById('gyroPrompt');
+        if (typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function') {
+            prompt.classList.remove('hidden');
+            prompt.addEventListener('click', function() {
+                DeviceOrientationEvent.requestPermission().then(function(r) {
+                    if (r === 'granted') {
+                        window.addEventListener('deviceorientation', onOrientation);
+                    }
+                    prompt.classList.add('hidden');
+                });
+            });
+        } else if (typeof DeviceOrientationEvent !== 'undefined') {
+            window.addEventListener('deviceorientation', onOrientation);
+        }
+
+        // Hide overlay after a few seconds, toggle on tap
+        var overlayEl = document.getElementById('overlay');
+        setTimeout(function() { overlayEl.classList.add('hidden'); }, 4000);
+        canvas.addEventListener('click', function() {
+            overlayEl.classList.toggle('hidden');
+        });
+
+        // --- Resize ---
+        function resize() {
+            var dpr = window.devicePixelRatio || 1;
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- Render loop ---
+        function render() {
+            offsetX += (targetX - offsetX) * 0.08;
+            offsetY += (targetY - offsetY) * 0.08;
+            gl.uniform2f(uOffset, offsetX, offsetY);
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+            requestAnimationFrame(render);
+        }
+    })();
+    </script>
+</body>
+</html>
