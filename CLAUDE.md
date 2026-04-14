@@ -48,6 +48,16 @@ for f in *.py; do python3 -c "import py_compile; py_compile.compile('$f', dorais
 All configuration lives in `config.yaml`. The Python files have inline
 `DEFAULT_CONFIG` dicts that mirror the YAML structure — keep them in sync.
 
+**Secrets**: The RTSP URL (contains camera credentials) is loaded from the
+environment variable `CAMERA_RTSP_URL`, set in `/etc/depth-camera.env` on the
+Pi. The `config.yaml` in the repo has only placeholder values. Never commit
+real credentials. The env var override is in `ring_buffer.py`, `relay.py`,
+and `monitor.py`.
+
+**Deployment**: `setup.sh` installs to `/opt/depth-camera/` and creates systemd
+services that read from there. The env file is at `/etc/depth-camera.env`
+(mode 600). IFTTT reaches the Pi via Tailscale Funnel (HTTPS, no port forwarding).
+
 ## Coexistence
 
 Runs alongside `family-calendar` on the same Pi 5 (16GB) with no conflicts.

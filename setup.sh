@@ -64,7 +64,20 @@ cp "$SCRIPT_DIR"/templates/*.html "$INSTALL_DIR/templates/"
 
 if [ ! -f "$INSTALL_DIR/config.yaml" ]; then
     cp "$SCRIPT_DIR/config.yaml" "$INSTALL_DIR/"
-    echo "  ⚠  Edit /opt/depth-camera/config.yaml with your camera RTSP URL!"
+fi
+
+# Create environment file for secrets (not in the repo)
+ENV_FILE="/etc/depth-camera.env"
+if [ ! -f "$ENV_FILE" ]; then
+    cat > "$ENV_FILE" << 'ENVEOF'
+# Camera RTSP URL — the only secret this project needs.
+# Find it in: Aqara App → Camera → Settings → RTSP
+CAMERA_RTSP_URL=rtsp://USER:PASS@CAMERA_IP:8554/stream_path
+ENVEOF
+    chmod 600 "$ENV_FILE"
+    echo "  ⚠  Edit /etc/depth-camera.env with your camera's RTSP URL!"
+else
+    echo "  ✓ /etc/depth-camera.env already exists (not overwritten)"
 fi
 
 # Create data directory
@@ -100,6 +113,7 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=/opt/depth-camera
+EnvironmentFile=/etc/depth-camera.env
 ExecStart=/usr/bin/python3 ring_buffer.py --config config.yaml
 Restart=always
 RestartSec=5
@@ -120,6 +134,7 @@ Wants=depth-ring.service
 Type=simple
 User=root
 WorkingDirectory=/opt/depth-camera
+EnvironmentFile=/etc/depth-camera.env
 ExecStart=/usr/bin/python3 relay.py --config config.yaml
 Restart=on-failure
 RestartSec=15
@@ -159,6 +174,7 @@ Wants=depth-ring.service
 Type=simple
 User=root
 WorkingDirectory=/opt/depth-camera
+EnvironmentFile=/etc/depth-camera.env
 ExecStart=/usr/bin/python3 monitor.py --config config.yaml
 Restart=on-failure
 RestartSec=15
@@ -184,14 +200,12 @@ echo "=========================================="
 echo "  Setup Complete!"
 echo "=========================================="
 echo ""
-echo "  STEP 1 — Edit the config:"
-echo "    nano /opt/depth-camera/config.yaml"
-echo "    Set camera.rtsp_url to your Aqara G5 Pro's RTSP URL"
+echo "  STEP 1 — Set your camera RTSP URL:"
+echo "    sudo nano /etc/depth-camera.env"
+echo "    Set: CAMERA_RTSP_URL=rtsp://USER:PASS@CAMERA_IP:8554/stream_path"
 echo ""
 echo "  STEP 2 — Start services:"
-echo "    sudo systemctl start depth-ring"
-echo "    sudo systemctl start depth-relay"
-echo "    sudo systemctl start depth-gallery"
+echo "    sudo systemctl start depth-ring depth-relay depth-gallery"
 echo ""
 echo "  STEP 3 — Verify ring buffer:"
 echo "    ls -la /tmp/depth-ring/"
@@ -199,11 +213,13 @@ echo ""
 echo "  STEP 4 — Browse the gallery:"
 echo "    http://$(hostname -I | awk '{print $1}'):8080/"
 echo ""
-echo "  STEP 5 — Configure IFTTT:"
-echo "    URL: http://YOUR_HOME_IP:9090/ifttt"
-echo "    Method: POST, Body: {\"event_type\": \"person\", \"source\": \"ifttt\"}"
+echo "  STEP 5 — Expose webhook for IFTTT (via Tailscale Funnel):"
+echo "    curl -fsSL https://tailscale.com/install.sh | sh"
+echo "    sudo tailscale up"
+echo "    sudo tailscale funnel 9090"
+echo "    # Then use your Funnel URL in IFTTT (e.g. https://your-hostname.your-tailnet.ts.net/ifttt)"
 echo ""
-echo "  NOTE: The depth model (~50 MB) downloads automatically on first event."
+echo "  NOTE: The depth model (~50 MB) downloads automatically on first run."
 echo "  First event will take ~15s (download + inference). Subsequent: ~3-6s."
 echo ""
 echo "  OPTIONAL — Enable local motion monitor:"

@@ -16,7 +16,7 @@ Browse the results in a web gallery on your phone or laptop.
 ┌──────────────────── Your LAN ────────────────────┐
 │                                                   │
 │  Aqara G5 Pro ◄──RTSP──┐                         │
-│  192.168.1.100          │ (one persistent conn)   │
+│  (LAN camera)           │ (one persistent conn)   │
 │                         │                         │
 │  Raspberry Pi 5 ────────┘                         │
 │  ┌─────────────────────────────────────────────┐  │
@@ -88,18 +88,19 @@ cd ~/depth-camera
 sudo ./setup.sh
 ```
 
-### 2. Configure
+### 2. Configure camera
+
+Set your RTSP URL in the environment file (keeps credentials out of the repo):
 
 ```bash
-sudo nano /opt/depth-camera/config.yaml
+sudo nano /etc/depth-camera.env
 ```
 
-Set your camera's RTSP URL (find it in: Aqara App → Camera → Settings → RTSP):
-
-```yaml
-camera:
-  rtsp_url: "rtsp://USER:PASS@192.168.1.100:8554/1520p"
 ```
+CAMERA_RTSP_URL=rtsp://USER:PASS@CAMERA_IP:8554/stream_path
+```
+
+Find your Aqara G5 Pro's URL in: Aqara App → Camera → Settings → RTSP.
 
 ### 3. Start
 
@@ -117,21 +118,33 @@ ls -la /tmp/depth-ring/
 curl http://localhost:8080/api/status
 ```
 
-### 5. Set up IFTTT
+### 5. Expose webhook for IFTTT (via Tailscale Funnel)
+
+IFTTT needs to reach the Pi from the internet. Tailscale Funnel provides
+encrypted HTTPS access without port forwarding:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+sudo tailscale funnel 9090
+```
+
+Note the Funnel URL (e.g., `https://your-hostname.your-tailnet.ts.net`).
+
+### 6. Set up IFTTT
 
 1. In **Aqara Home** app, enable AI detection (person, animal, etc.)
 2. In **IFTTT**, create an applet:
    - **If This:** Aqara Home → detection trigger
    - **Then That:** Webhooks → Make a web request
-     - URL: `http://YOUR_HOME_IP:9090/ifttt`
+     - URL: `https://YOUR_TAILSCALE_FUNNEL_URL/ifttt`
      - Method: POST
      - Content-Type: application/json
      - Body: `{"event_type": "person", "source": "ifttt"}`
-3. Port-forward 9090 on your router (or use Cloudflare Tunnel / ngrok)
 
-### 6. Browse
+### 7. Browse
 
-Open `http://<PI_IP>:8080/` on your phone or laptop.
+Open `http://<PI_IP>:8080/` on your phone or laptop (LAN or Tailscale IP).
 
 ## Project Structure
 
