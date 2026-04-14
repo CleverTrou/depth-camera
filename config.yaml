@@ -4,10 +4,13 @@
 # Everything runs on the Pi. No VPS, no cloud compute.
 
 camera:
-  # Aqara G5 Pro RTSP URL (LAN IP — Pi is on the same network).
-  # Find in: Aqara App → Camera → Settings → RTSP
-  # Use 1520p — ring buffer uses -c copy so resolution has zero CPU impact.
-  rtsp_url: "rtsp://USER:PASS@192.168.1.100:8554/1520p"
+  # RTSP URL is loaded from the environment variable CAMERA_RTSP_URL.
+  # Set it in /etc/depth-camera.env (created by setup.sh):
+  #   CAMERA_RTSP_URL=rtsp://USER:PASS@CAMERA_IP:8554/stream_path
+  #
+  # Find your Aqara G5 Pro's URL in: Aqara App → Camera → Settings → RTSP
+  # This placeholder is only used if the env var is not set.
+  rtsp_url: "rtsp://USER:PASS@CAMERA_IP:8554/stream_path"
   rtsp_transport: "tcp"
 
 ring_buffer:

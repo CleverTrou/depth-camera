@@ -33,7 +33,7 @@ from pipeline import process_event
 
 DEFAULT_CONFIG = {
     "camera": {
-        "rtsp_url": "rtsp://USER:PASS@192.168.1.100:8554/1520p",
+        "rtsp_url": "rtsp://USER:PASS@CAMERA_IP:8554/stream_path",
         "rtsp_transport": "tcp",
     },
     "ring_buffer": {
