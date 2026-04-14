@@ -129,7 +129,7 @@ sudo tailscale up
 sudo tailscale funnel 9090
 ```
 
-Note the Funnel URL (e.g., `https://parallax.your-tailnet.ts.net`).
+Note the Funnel URL (e.g., `https://your-hostname.your-tailnet.ts.net`).
 
 ### 6. Set up IFTTT
 
