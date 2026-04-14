@@ -67,12 +67,18 @@ def extract_frame(
             f"using oldest segment ({best.name}, {age:.0f}s old)"
         )
 
-    # Extract one JPEG frame via ffmpeg
-    cmd = ["ffmpeg", "-y", "-loglevel", "error"]
+    # Extract one JPEG frame via ffmpeg.
+    # Place -ss AFTER -i (output seeking) so ffmpeg decodes from the segment
+    # start and lands on a clean frame. With 2s segments this is near-instant.
+    # Input seeking (-ss before -i) causes smeared frames because it lands on
+    # P-frames without their reference I-frame.
+    cmd = [
+        "ffmpeg", "-y", "-loglevel", "error",
+        "-i", str(best),
+    ]
     if seek_pos > 0.3:
         cmd += ["-ss", f"{seek_pos:.1f}"]
     cmd += [
-        "-i", str(best),
         "-vframes", "1",
         "-q:v", str(quality),
         "-f", "image2pipe",
