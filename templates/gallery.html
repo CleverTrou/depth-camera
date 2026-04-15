@@ -53,6 +53,8 @@
         .event-type.person { background: #1a2e1a; color: #7cff8a; }
         .event-type.animal { background: #2e2a1a; color: #ffcf7c; }
         .event-type.package { background: #2e1a2a; color: #cf7cff; }
+        .event-type.vehicle { background: #1a2a2e; color: #7cd4ff; }
+        .event-type.lingering { background: #2e1a1a; color: #ff7c7c; }
         .event-actions { display: flex; gap: 8px; }
         .btn {
             display: inline-block; padding: 6px 14px;
@@ -103,7 +105,7 @@
                     <div class="event-time">{{ event.timestamp[:16].replace('T', ' ') if event.timestamp else event.event_id[:15] }}</div>
                     <div class="event-detail">
                         {% if event.event_type %}
-                        <span class="event-type {{ 'person' if 'person' in event.event_type else 'animal' if 'animal' in event.event_type else 'package' if 'package' in event.event_type else '' }}">{{ event.event_type }}</span>
+                        <span class="event-type {{ 'lingering' if 'linger' in event.event_type else 'person' if 'person' in event.event_type else 'animal' if 'animal' in event.event_type else 'package' if 'package' in event.event_type else 'vehicle' if 'vehicle' in event.event_type else '' }}">{{ event.event_type }}</span>
                         {% endif %}
                         {% if event.elapsed_s %}
                         <span>{{ event.elapsed_s }}s</span>
