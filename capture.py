@@ -42,6 +42,15 @@ def extract_frame(
         log.warning("Ring buffer empty — no segments found")
         return None
 
+    # The newest segment is actively being written by ffmpeg — reading it
+    # risks incomplete frames (bottom-of-image smearing). Exclude it.
+    if len(segments) >= 2:
+        active_seg = segments[-1]
+        candidates = segments[:-1]
+        log.debug(f"Skipping active segment {active_seg.name}")
+    else:
+        candidates = segments
+
     now = time.time()
     target_time = now - lookback_s
 
@@ -49,7 +58,7 @@ def extract_frame(
     best = None
     seek_pos = 0.0
 
-    for seg in reversed(segments):
+    for seg in reversed(candidates):
         seg_end = seg.stat().st_mtime
         seg_start = seg_end - segment_seconds
         if seg_start <= target_time <= seg_end:
@@ -58,13 +67,13 @@ def extract_frame(
             break
 
     if best is None:
-        # Target time outside buffer — use oldest available
-        best = segments[0]
+        # Target time outside buffer — use newest completed segment
+        best = candidates[-1] if candidates else segments[0]
         seek_pos = 0.0
         age = now - best.stat().st_mtime
         log.info(
-            f"Lookback {lookback_s:.0f}s exceeds buffer; "
-            f"using oldest segment ({best.name}, {age:.0f}s old)"
+            f"Lookback {lookback_s:.0f}s exceeds completed buffer; "
+            f"using newest complete segment ({best.name}, {age:.0f}s old)"
         )
 
     # Extract one JPEG frame via ffmpeg.
