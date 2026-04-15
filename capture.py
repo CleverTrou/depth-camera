@@ -8,6 +8,7 @@ the segment that was being written at a specified time in the past.
 
 import logging
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 
@@ -56,19 +57,22 @@ def extract_frame(
 
     # Walk newest-first to find the segment containing our target time.
     best = None
+    best_idx = None
     seek_pos = 0.0
 
-    for seg in reversed(candidates):
+    for i, seg in enumerate(reversed(candidates)):
         seg_end = seg.stat().st_mtime
         seg_start = seg_end - segment_seconds
         if seg_start <= target_time <= seg_end:
             best = seg
+            best_idx = len(candidates) - 1 - i
             seek_pos = max(0, target_time - seg_start)
             break
 
     if best is None:
         # Target time outside buffer — use newest completed segment
         best = candidates[-1] if candidates else segments[0]
+        best_idx = len(candidates) - 1
         seek_pos = 0.0
         age = now - best.stat().st_mtime
         log.info(
@@ -76,32 +80,58 @@ def extract_frame(
             f"using newest complete segment ({best.name}, {age:.0f}s old)"
         )
 
-    # Extract one JPEG frame via ffmpeg.
-    # Place -ss AFTER -i (output seeking) so ffmpeg decodes from the segment
-    # start and lands on a clean frame. With 2s segments this is near-instant.
-    # Input seeking (-ss before -i) causes smeared frames because it lands on
-    # P-frames without their reference I-frame.
-    cmd = [
-        "ffmpeg", "-y", "-loglevel", "error",
-        "-i", str(best),
-    ]
-    if seek_pos > 0.3:
-        cmd += ["-ss", f"{seek_pos:.1f}"]
-    cmd += [
-        "-vframes", "1",
-        "-q:v", str(quality),
-        "-f", "image2pipe",
-        "-c:v", "mjpeg",
-        "pipe:1",
-    ]
+    # Concatenate the target segment with the one before it. H.264 uses
+    # keyframes (I-frames) every few seconds — if the camera's GOP interval
+    # exceeds 2s, a single segment may not contain a keyframe, causing
+    # smeared/corrupt frames. Feeding ffmpeg two consecutive segments
+    # guarantees at least one keyframe to decode from.
+    feed_segments = []
+    if best_idx is not None and best_idx > 0:
+        feed_segments.append(candidates[best_idx - 1])
+        seek_pos += segment_seconds  # offset past prepended segment
+    feed_segments.append(best)
 
+    concat_file = None
     try:
+        if len(feed_segments) > 1:
+            # Use ffmpeg concat demuxer to read both segments
+            concat_file = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False,
+            )
+            for seg in feed_segments:
+                concat_file.write(f"file '{seg}'\n")
+            concat_file.close()
+
+            cmd = [
+                "ffmpeg", "-y", "-loglevel", "error",
+                "-f", "concat", "-safe", "0",
+                "-i", concat_file.name,
+            ]
+            log.debug(f"Concat: {[s.name for s in feed_segments]}")
+        else:
+            cmd = [
+                "ffmpeg", "-y", "-loglevel", "error",
+                "-i", str(best),
+            ]
+
+        # Output seeking (-ss after -i): ffmpeg decodes from the start,
+        # ensuring it hits a keyframe before our target frame.
+        if seek_pos > 0.3:
+            cmd += ["-ss", f"{seek_pos:.1f}"]
+        cmd += [
+            "-vframes", "1",
+            "-q:v", str(quality),
+            "-f", "image2pipe",
+            "-c:v", "mjpeg",
+            "pipe:1",
+        ]
+
         result = subprocess.run(cmd, capture_output=True, timeout=10)
         if result.returncode == 0 and len(result.stdout) > 1000:
             log.info(
                 f"Extracted frame: {best.name} "
                 f"(lookback={lookback_s:.0f}s, seek={seek_pos:.1f}s, "
-                f"{len(result.stdout):,} bytes)"
+                f"segs={len(feed_segments)}, {len(result.stdout):,} bytes)"
             )
             return result.stdout
         log.warning(
@@ -112,6 +142,9 @@ def extract_frame(
         log.warning("Frame extraction timed out")
     except Exception as e:
         log.error(f"Frame extraction error: {e}")
+    finally:
+        if concat_file:
+            Path(concat_file.name).unlink(missing_ok=True)
 
     return None
 

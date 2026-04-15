@@ -13,6 +13,7 @@ Usage:
 """
 
 import argparse
+import json
 import logging
 import os
 from pathlib import Path
@@ -82,6 +83,15 @@ def _get_events() -> list[dict]:
         colormap = event_dir / "depth_colormap.jpg"
         depth_map = event_dir / "depth_map.png"
         ply = event_dir / "pointcloud.ply"
+        meta_file = event_dir / "metadata.json"
+
+        # Read saved metadata if available
+        meta = {}
+        if meta_file.exists():
+            try:
+                meta = json.loads(meta_file.read_text())
+            except (json.JSONDecodeError, OSError):
+                pass
 
         events.append({
             "event_id": event_dir.name,
@@ -90,6 +100,10 @@ def _get_events() -> list[dict]:
             "has_depth_map": depth_map.exists(),
             "has_ply": ply.exists(),
             "ply_size": ply.stat().st_size if ply.exists() else 0,
+            "event_type": meta.get("event_type", ""),
+            "source": meta.get("source", ""),
+            "timestamp": meta.get("timestamp", ""),
+            "elapsed_s": meta.get("elapsed_s", 0),
         })
 
     return events
