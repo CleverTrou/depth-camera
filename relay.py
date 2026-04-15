@@ -136,10 +136,17 @@ def _capture_and_process(source, event_type, lookback_override=None):
 
 
 @app.route("/ifttt", methods=["POST"])
-def ifttt_webhook():
-    """Receive an IFTTT webhook and process the event."""
+@app.route("/ifttt/<path_type>", methods=["POST"])
+def ifttt_webhook(path_type=None):
+    """Receive a webhook and process the event.
+
+    Event type can come from:
+      1. URL path: /ifttt/person, /ifttt/animal, /ifttt/package (most reliable for IFTTT)
+      2. JSON body: {"event_type": "person_detected"} (for Home Assistant, etc.)
+      3. Fallback: "detection"
+    """
     data = request.get_json(silent=True) or {}
-    event_type = data.get("event_type", "ifttt_detection")
+    event_type = path_type or data.get("event_type", "detection")
     source = data.get("source", "ifttt")
 
     # If the caller provides a Unix timestamp of the actual detection,
