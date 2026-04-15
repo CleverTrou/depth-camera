@@ -19,6 +19,7 @@ Events are stored in the data directory:
 """
 
 import io
+import json
 import logging
 import shutil
 import threading
@@ -123,16 +124,23 @@ def process_event(
         elapsed = time.time() - t_start
         log.info(f"[{event_id}] Pipeline complete in {elapsed:.1f}s")
 
-        # Step 4: Housekeeping — remove oldest events
-        _cleanup_old_events(events_dir, max_events)
-
-        return {
+        # Step 4: Save metadata
+        metadata = {
             "event_id": event_id,
             "source": source,
             "event_type": event_type,
+            "timestamp": datetime.now().isoformat(),
             "elapsed_s": round(elapsed, 1),
-            "dir": str(event_dir),
+            "depth_input_size": depth_input_size,
+            "ply_downsample": ply_downsample,
+            "image_size": list(pil_image.size),
         }
+        (event_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
+
+        # Step 5: Housekeeping — remove oldest events
+        _cleanup_old_events(events_dir, max_events)
+
+        return metadata
 
     except Exception as e:
         log.error(f"[{event_id}] Pipeline failed: {e}", exc_info=True)

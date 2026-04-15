@@ -11,12 +11,22 @@
             background: #0a0a0a; color: #e0e0e0;
             padding: 20px; max-width: 960px; margin: 0 auto;
         }
-        h1 { margin-bottom: 4px; font-size: 1.5rem; color: #fff; }
-        .subtitle { color: #666; margin-bottom: 24px; font-size: 0.85rem; }
+        header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; }
+        h1 { font-size: 1.5rem; color: #fff; }
+        .subtitle { color: #666; font-size: 0.85rem; }
+        .live-dot {
+            display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+            background: #22c55e; margin-right: 6px; vertical-align: middle;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .live-label { font-size: 0.75rem; color: #555; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
         .event-card {
             background: #141414; border: 1px solid #222; border-radius: 12px;
             margin-bottom: 16px; overflow: hidden;
+            animation: fadeIn 0.3s ease-out;
         }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
         .event-images {
             display: flex; gap: 0; cursor: pointer;
         }
@@ -28,10 +38,21 @@
             display: flex; align-items: center; justify-content: space-between;
             padding: 12px 16px; border-top: 1px solid #1a1a1a;
         }
-        .event-id {
-            font-family: "SF Mono", "Menlo", monospace;
-            font-size: 0.8rem; color: #888;
+        .event-meta { display: flex; flex-direction: column; gap: 2px; }
+        .event-time {
+            font-size: 0.85rem; color: #ccc;
         }
+        .event-detail {
+            display: flex; gap: 8px; align-items: center;
+            font-size: 0.75rem; color: #555;
+        }
+        .event-type {
+            background: #1a1a2e; color: #7c8aff; padding: 2px 8px;
+            border-radius: 4px; font-size: 0.7rem; font-weight: 500;
+        }
+        .event-type.person { background: #1a2e1a; color: #7cff8a; }
+        .event-type.animal { background: #2e2a1a; color: #ffcf7c; }
+        .event-type.package { background: #2e1a2a; color: #cf7cff; }
         .event-actions { display: flex; gap: 8px; }
         .btn {
             display: inline-block; padding: 6px 14px;
@@ -42,7 +63,6 @@
         .btn-view:hover { background: #2563eb; }
         .btn-download { background: #222; color: #aaa; border: 1px solid #333; }
         .btn-download:hover { background: #2a2a2a; color: #fff; }
-        .ply-size { font-size: 0.7rem; color: #555; margin-top: 2px; }
         .empty {
             text-align: center; padding: 80px 20px; color: #444;
             font-size: 1.1rem;
@@ -55,12 +75,21 @@
     </style>
 </head>
 <body>
-    <h1>Depth Camera</h1>
-    <p class="subtitle">Aqara G5 Pro &rarr; Depth Anything V2 &rarr; 2.5D depth maps</p>
+    <header>
+        <div>
+            <h1>Depth Camera</h1>
+            <p class="subtitle">Aqara G5 Pro &rarr; Depth Anything V2 &rarr; 2.5D depth maps</p>
+        </div>
+        <div>
+            <span class="live-dot"></span>
+            <span class="live-label" id="event-count">{{ events|length }} events</span>
+        </div>
+    </header>
 
+    <div id="events-container">
     {% if events %}
         {% for event in events %}
-        <div class="event-card">
+        <div class="event-card" data-event-id="{{ event.event_id }}">
             <a href="/events/{{ event.event_id }}/viewer" class="event-images">
                 {% if event.has_snapshot %}
                 <img src="/events/{{ event.event_id }}/snapshot.jpg" alt="snapshot" loading="lazy">
@@ -70,8 +99,19 @@
                 {% endif %}
             </a>
             <div class="event-footer">
-                <div>
-                    <div class="event-id">{{ event.event_id }}</div>
+                <div class="event-meta">
+                    <div class="event-time">{{ event.timestamp[:16].replace('T', ' ') if event.timestamp else event.event_id[:15] }}</div>
+                    <div class="event-detail">
+                        {% if event.event_type %}
+                        <span class="event-type {{ 'person' if 'person' in event.event_type else 'animal' if 'animal' in event.event_type else 'package' if 'package' in event.event_type else '' }}">{{ event.event_type }}</span>
+                        {% endif %}
+                        {% if event.elapsed_s %}
+                        <span>{{ event.elapsed_s }}s</span>
+                        {% endif %}
+                        {% if event.source %}
+                        <span>via {{ event.source }}</span>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="event-actions">
                     {% if event.has_depth_map and event.has_snapshot %}
@@ -94,5 +134,30 @@
             <div class="empty-sub">Waiting for camera detections...</div>
         </div>
     {% endif %}
+    </div>
+
+    <script>
+    (function() {
+        var knownCount = {{ events|length }};
+        var pollInterval = 10000; // 10 seconds
+
+        function checkForUpdates() {
+            fetch('/api/events')
+                .then(function(r) { return r.json(); })
+                .then(function(events) {
+                    var label = document.getElementById('event-count');
+                    if (label) label.textContent = events.length + ' events';
+                    if (events.length !== knownCount) {
+                        // New event arrived (or one was cleaned up) — reload
+                        knownCount = events.length;
+                        location.reload();
+                    }
+                })
+                .catch(function() { /* gallery server might be restarting */ });
+        }
+
+        setInterval(checkForUpdates, pollInterval);
+    })();
+    </script>
 </body>
 </html>
