@@ -98,15 +98,17 @@ app = Flask(__name__)
 _config = {}
 
 
-def _capture_and_process(source, event_type):
+def _capture_and_process(source, event_type, lookback_override=None):
     """Capture a frame from the ring buffer and run the depth pipeline."""
     relay = _config["relay"]
     ring = _config["ring_buffer"]
     pipe = _config["pipeline"]
 
+    lookback = lookback_override if lookback_override is not None else relay["lookback_s"]
+
     # Try ring buffer first, fall back to live RTSP
     image_data = extract_frame(
-        ring["dir"], relay["lookback_s"],
+        ring["dir"], lookback,
         ring["segment_seconds"], relay["snapshot_quality"],
     )
     if image_data is None:
@@ -140,19 +142,37 @@ def ifttt_webhook():
     event_type = data.get("event_type", "ifttt_detection")
     source = data.get("source", "ifttt")
 
-    log.info(f"IFTTT webhook received: type={event_type}")
+    # If the caller provides a Unix timestamp of the actual detection,
+    # compute an exact lookback instead of using the configured guess.
+    # Works with Home Assistant, Aqara API, or any source that knows
+    # when the event actually happened.
+    lookback_override = None
+    event_ts = data.get("timestamp")
+    if event_ts is not None:
+        try:
+            lookback_override = max(0.5, time.time() - float(event_ts))
+            log.info(f"IFTTT webhook received: type={event_type}, "
+                     f"exact lookback={lookback_override:.1f}s")
+        except (ValueError, TypeError):
+            log.warning(f"Invalid timestamp in payload: {event_ts}")
+            log.info(f"IFTTT webhook received: type={event_type}")
+    else:
+        log.info(f"IFTTT webhook received: type={event_type}, "
+                 f"using default lookback={_config['relay']['lookback_s']}s")
 
-    # Process in a background thread so IFTTT doesn't time out
+    # Process in a background thread so the caller doesn't time out
     thread = threading.Thread(
         target=_capture_and_process,
-        args=(source, event_type),
+        args=(source, event_type, lookback_override),
         daemon=True,
     )
     thread.start()
 
+    lookback_used = lookback_override or _config["relay"]["lookback_s"]
     return jsonify({
         "status": "processing",
-        "lookback_s": _config["relay"]["lookback_s"],
+        "lookback_s": round(lookback_used, 1),
+        "exact_timestamp": lookback_override is not None,
     })
 
 
