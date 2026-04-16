@@ -21,6 +21,20 @@
         }
         .live-label { font-size: 0.75rem; color: #555; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* --- Toast for new events --- */
+        .new-events-toast {
+            position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+            background: #1d4ed8; color: #fff; padding: 10px 20px;
+            border-radius: 24px; font-size: 0.85rem; font-weight: 500;
+            cursor: pointer; z-index: 100; opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+            pointer-events: none; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .new-events-toast.visible {
+            opacity: 1; pointer-events: auto;
+        }
+
         .event-card {
             background: #141414; border: 1px solid #222; border-radius: 12px;
             margin-bottom: 16px; overflow: hidden;
@@ -32,7 +46,7 @@
         }
         .event-images img {
             width: 50%; height: auto; display: block;
-            aspect-ratio: 16/9; object-fit: cover;
+            object-fit: contain; background: #0a0a0a;
         }
         .event-footer {
             display: flex; align-items: center; justify-content: space-between;
@@ -70,8 +84,12 @@
             font-size: 1.1rem;
         }
         .empty-sub { font-size: 0.85rem; color: #333; margin-top: 8px; }
-        @media (max-width: 600px) {
+
+        /* --- Mobile: stack images vertically --- */
+        @media (max-width: 640px) {
             body { padding: 12px; }
+            .event-images { flex-direction: column; }
+            .event-images img { width: 100%; }
             .event-footer { flex-direction: column; gap: 10px; align-items: flex-start; }
         }
     </style>
@@ -87,6 +105,8 @@
             <span class="live-label" id="event-count">{{ events|length }} events</span>
         </div>
     </header>
+
+    <div class="new-events-toast" id="newEventsToast"></div>
 
     <div id="events-container">
     {% if events %}
@@ -140,25 +160,53 @@
 
     <script>
     (function() {
-        var knownCount = {{ events|length }};
-        var pollInterval = 10000; // 10 seconds
+        // Track known event IDs from the initial page render
+        var knownIds = {};
+        document.querySelectorAll('.event-card[data-event-id]').forEach(function(el) {
+            knownIds[el.getAttribute('data-event-id')] = true;
+        });
+        var knownCount = Object.keys(knownIds).length;
+
+        var toast = document.getElementById('newEventsToast');
+        var pendingNew = 0;
 
         function checkForUpdates() {
             fetch('/api/events')
                 .then(function(r) { return r.json(); })
                 .then(function(events) {
+                    // Update event count
                     var label = document.getElementById('event-count');
                     if (label) label.textContent = events.length + ' events';
-                    if (events.length !== knownCount) {
-                        // New event arrived (or one was cleaned up) — reload
-                        knownCount = events.length;
+
+                    // Count genuinely new events
+                    var newIds = [];
+                    events.forEach(function(ev) {
+                        if (!knownIds[ev.event_id]) newIds.push(ev.event_id);
+                    });
+
+                    if (newIds.length === 0) return;
+
+                    // If near the top of page, silently reload
+                    if (window.scrollY < 150) {
                         location.reload();
+                        return;
                     }
+
+                    // Otherwise show a toast
+                    pendingNew = newIds.length;
+                    toast.textContent = pendingNew + ' new event' + (pendingNew > 1 ? 's' : '') + ' — tap to view';
+                    toast.classList.add('visible');
                 })
                 .catch(function() { /* gallery server might be restarting */ });
         }
 
-        setInterval(checkForUpdates, pollInterval);
+        // Tap toast: scroll to top and reload
+        toast.addEventListener('click', function() {
+            window.scrollTo({ top: 0, behavior: 'instant' });
+            location.reload();
+        });
+
+        setInterval(checkForUpdates, 10000);
     })();
     </script>
 </body>

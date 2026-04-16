@@ -23,6 +23,10 @@
             font-family: "SF Mono", monospace; font-size: 0.75rem;
             color: rgba(255,255,255,0.5);
         }
+        .input-mode {
+            font-family: "SF Mono", monospace; font-size: 0.65rem;
+            color: rgba(255,255,255,0.3); margin-top: 4px;
+        }
         .overlay-actions { display: flex; gap: 8px; }
         .btn {
             padding: 8px 14px; border-radius: 8px; font-size: 0.8rem;
@@ -54,7 +58,10 @@
     <canvas id="canvas"></canvas>
 
     <div class="overlay" id="overlay">
-        <div class="event-label">{{ event_id }}</div>
+        <div>
+            <div class="event-label">{{ event_id }}</div>
+            <div class="input-mode" id="inputMode"></div>
+        </div>
         <div class="overlay-actions">
             <a href="/" class="btn btn-back">&larr; Gallery</a>
             <a href="/events/{{ event_id }}/pointcloud.ply" class="btn btn-ply">Download PLY</a>
@@ -96,10 +103,7 @@
             'uniform float u_strength;',
             'varying vec2 v_uv;',
             'void main() {',
-            // Sample depth: red channel of the inferno colormap.
-            // Inferno maps near (bright/warm) to high R, far (dark/cool) to low R.
             '  float d = texture2D(u_depth, v_uv).r;',
-            // Displace UV: near objects (high d) shift more, creating parallax.
             '  vec2 disp = u_offset * d * u_strength;',
             '  vec2 uv = clamp(v_uv - disp, 0.0, 1.0);',
             '  gl_FragColor = texture2D(u_rgb, uv);',
@@ -121,7 +125,7 @@
         gl.linkProgram(prog);
         gl.useProgram(prog);
 
-        // --- Fullscreen quad (positions + UVs interleaved) ---
+        // --- Fullscreen quad ---
         var verts = new Float32Array([
             -1, -1,  0, 1,
              1, -1,  1, 1,
@@ -173,58 +177,113 @@
         loadTex(0, '/events/{{ event_id }}/snapshot.jpg');
         loadTex(1, '/events/{{ event_id }}/depth_colormap.jpg');
 
-        // --- Input: mouse (desktop) ---
+        // --- Input state ---
         var offsetX = 0, offsetY = 0;
         var targetX = 0, targetY = 0;
+        var inputMode = 'none';
+        var modeLabel = document.getElementById('inputMode');
+        var gyroActive = false;
 
+        function setInputMode(mode) {
+            inputMode = mode;
+            if (modeLabel) modeLabel.textContent = mode;
+        }
+
+        // --- Input: mouse (desktop) ---
         canvas.addEventListener('mousemove', function(e) {
-            targetX = (e.clientX / window.innerWidth - 0.5) * 2;
-            targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+            if (!gyroActive) {
+                targetX = (e.clientX / window.innerWidth - 0.5) * 2;
+                targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+                if (inputMode !== 'mouse') setInputMode('mouse');
+            }
         });
         canvas.addEventListener('mouseleave', function() {
-            targetX = 0; targetY = 0;
+            if (!gyroActive) { targetX = 0; targetY = 0; }
         });
 
-        // --- Input: touch (mobile fallback) ---
-        canvas.addEventListener('touchmove', function(e) {
-            e.preventDefault();
-            var t = e.touches[0];
-            targetX = (t.clientX / window.innerWidth - 0.5) * 2;
-            targetY = (t.clientY / window.innerHeight - 0.5) * 2;
-        }, { passive: false });
+        // --- Input: touch (mobile) ---
+        function handleTouch(e) {
+            if (!gyroActive) {
+                e.preventDefault();
+                var t = e.touches[0];
+                targetX = (t.clientX / window.innerWidth - 0.5) * 2;
+                targetY = (t.clientY / window.innerHeight - 0.5) * 2;
+                if (inputMode !== 'touch') setInputMode('touch');
+            }
+        }
+        canvas.addEventListener('touchstart', handleTouch, { passive: false });
+        canvas.addEventListener('touchmove', handleTouch, { passive: false });
         canvas.addEventListener('touchend', function() {
-            targetX = 0; targetY = 0;
+            if (!gyroActive) { targetX = 0; targetY = 0; }
         });
 
-        // --- Input: gyroscope (iPhone) ---
+        // --- Input: gyroscope ---
+        var gyroReceived = false;
         function onOrientation(e) {
-            if (e.gamma === null) return;
-            targetX = Math.max(-1, Math.min(1, e.gamma / 30));
-            targetY = Math.max(-1, Math.min(1, (e.beta - 45) / 30));
+            // Ignore zero events (some devices fire them before real data)
+            if (e.gamma === null && e.beta === null) return;
+            if (!gyroReceived) {
+                gyroReceived = true;
+                gyroActive = true;
+                setInputMode('gyroscope');
+            }
+            // gamma: left/right tilt (-90 to 90), beta: front/back tilt (-180 to 180)
+            // Normalize to -1..1 range. beta offset of 45 assumes phone held ~45 degrees
+            targetX = Math.max(-1, Math.min(1, (e.gamma || 0) / 25));
+            targetY = Math.max(-1, Math.min(1, ((e.beta || 0) - 45) / 25));
         }
 
-        // iOS 13+ requires user gesture for gyroscope permission
+        // Try to enable gyroscope
         var prompt = document.getElementById('gyroPrompt');
-        if (typeof DeviceOrientationEvent !== 'undefined' &&
-            typeof DeviceOrientationEvent.requestPermission === 'function') {
-            prompt.classList.remove('hidden');
-            prompt.addEventListener('click', function() {
-                DeviceOrientationEvent.requestPermission().then(function(r) {
-                    if (r === 'granted') {
-                        window.addEventListener('deviceorientation', onOrientation);
-                    }
-                    prompt.classList.add('hidden');
-                });
-            });
-        } else if (typeof DeviceOrientationEvent !== 'undefined') {
-            window.addEventListener('deviceorientation', onOrientation);
+        var isSecure = location.protocol === 'https:' || location.hostname === 'localhost'
+                    || location.hostname === '127.0.0.1';
+        var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+        if (isMobile && typeof DeviceOrientationEvent !== 'undefined') {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                // iOS 13+ — requires HTTPS + user gesture
+                if (isSecure) {
+                    prompt.classList.remove('hidden');
+                    prompt.addEventListener('click', function() {
+                        DeviceOrientationEvent.requestPermission().then(function(r) {
+                            if (r === 'granted') {
+                                window.addEventListener('deviceorientation', onOrientation);
+                            } else {
+                                setInputMode('touch (gyro denied)');
+                            }
+                            prompt.classList.add('hidden');
+                        }).catch(function() {
+                            prompt.classList.add('hidden');
+                            setInputMode('touch');
+                        });
+                    });
+                } else {
+                    // HTTP — iOS won't allow gyroscope permission
+                    setInputMode('touch (HTTPS needed for gyroscope)');
+                }
+            } else {
+                // Android or older iOS — gyroscope works without permission
+                window.addEventListener('deviceorientation', onOrientation);
+                // Wait briefly to see if we get real data
+                setTimeout(function() {
+                    if (!gyroReceived) setInputMode('touch');
+                }, 1500);
+            }
         }
 
-        // Hide overlay after a few seconds, toggle on tap
+        // --- Overlay toggle ---
         var overlayEl = document.getElementById('overlay');
-        setTimeout(function() { overlayEl.classList.add('hidden'); }, 4000);
+        var overlayTimer = setTimeout(function() { overlayEl.classList.add('hidden'); }, 4000);
+
         canvas.addEventListener('click', function() {
             overlayEl.classList.toggle('hidden');
+            // Reset auto-hide when showing
+            clearTimeout(overlayTimer);
+            if (!overlayEl.classList.contains('hidden')) {
+                overlayTimer = setTimeout(function() {
+                    overlayEl.classList.add('hidden');
+                }, 6000);
+            }
         });
 
         // --- Resize ---
@@ -239,8 +298,10 @@
 
         // --- Render loop ---
         function render() {
-            offsetX += (targetX - offsetX) * 0.08;
-            offsetY += (targetY - offsetY) * 0.08;
+            // Smooth interpolation — slightly faster for gyroscope for responsiveness
+            var lerp = gyroActive ? 0.12 : 0.08;
+            offsetX += (targetX - offsetX) * lerp;
+            offsetY += (targetY - offsetY) * lerp;
             gl.uniform2f(uOffset, offsetX, offsetY);
             gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
             requestAnimationFrame(render);
