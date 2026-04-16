@@ -125,16 +125,10 @@
         gl.linkProgram(prog);
         gl.useProgram(prog);
 
-        // --- Fullscreen quad ---
-        var verts = new Float32Array([
-            -1, -1,  0, 1,
-             1, -1,  1, 1,
-            -1,  1,  0, 0,
-             1,  1,  1, 0,
-        ]);
+        // --- Quad buffer (vertices updated after image loads to maintain aspect ratio) ---
         var buf = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-        gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(16), gl.DYNAMIC_DRAW);
 
         var aPos = gl.getAttribLocation(prog, 'a_pos');
         gl.enableVertexAttribArray(aPos);
@@ -153,15 +147,38 @@
         gl.uniform1i(uDepth, 1);
         gl.uniform1f(uStrength, 0.04);
 
+        // Scale quad to maintain image aspect ratio within the screen (contain).
+        // UV coords stay 0-1 (full texture); only the position quad shrinks.
+        var imageAspect = 16 / 9; // fallback until image loads
+        function updateQuad() {
+            var screenAspect = canvas.width / canvas.height;
+            var sx, sy;
+            if (screenAspect > imageAspect) {
+                // Screen wider than image — pillarbox (constrain by height)
+                sy = 1.0; sx = imageAspect / screenAspect;
+            } else {
+                // Screen taller than image — letterbox (constrain by width)
+                sx = 1.0; sy = screenAspect / imageAspect;
+            }
+            gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+                -sx, -sy,  0, 1,
+                 sx, -sy,  1, 1,
+                -sx,  sy,  0, 0,
+                 sx,  sy,  1, 0,
+            ]), gl.DYNAMIC_DRAW);
+        }
+
         // --- Load textures ---
         var loaded = 0;
-        function onLoad() { loaded++; if (loaded >= 2) render(); }
+        function onLoad() { loaded++; if (loaded >= 2) { updateQuad(); render(); } }
 
-        function loadTex(unit, url) {
+        function loadTex(unit, url, onImageLoad) {
             var tex = gl.createTexture();
             var img = new Image();
             img.crossOrigin = '';
             img.onload = function() {
+                if (onImageLoad) onImageLoad(img);
                 gl.activeTexture(gl.TEXTURE0 + unit);
                 gl.bindTexture(gl.TEXTURE_2D, tex);
                 gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
@@ -174,7 +191,10 @@
             img.src = url;
         }
 
-        loadTex(0, '/events/{{ event_id }}/snapshot.jpg');
+        // Read actual image dimensions from snapshot to compute true aspect ratio
+        loadTex(0, '/events/{{ event_id }}/snapshot.jpg', function(img) {
+            imageAspect = img.naturalWidth / img.naturalHeight;
+        });
         loadTex(1, '/events/{{ event_id }}/depth_colormap.jpg');
 
         // --- Input state ---
@@ -292,6 +312,7 @@
             canvas.width = window.innerWidth * dpr;
             canvas.height = window.innerHeight * dpr;
             gl.viewport(0, 0, canvas.width, canvas.height);
+            if (loaded >= 2) updateQuad();
         }
         window.addEventListener('resize', resize);
         resize();
