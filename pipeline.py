@@ -32,6 +32,7 @@ import numpy as np
 from PIL import Image
 
 from depth import estimate_depth, load_model
+from notifications import push_ntfy
 from outputs import generate_colormap, generate_depth_image, generate_pointcloud
 
 log = logging.getLogger("pipeline")
@@ -60,6 +61,7 @@ def process_event(
     ply_downsample: int = 2,
     depth_input_size: int = 518,
     colormap: str = "inferno",
+    ntfy_topic_url: str | None = None,
 ) -> dict | None:
     """
     Run the full processing pipeline on a captured JPEG frame.
@@ -144,6 +146,14 @@ def process_event(
 
     except Exception as e:
         log.error(f"[{event_id}] Pipeline failed: {e}", exc_info=True)
+        push_ntfy(
+            ntfy_topic_url,
+            "Depth Camera: pipeline failed",
+            f"Event {event_id} ({event_type} from {source}) — "
+            f"{type(e).__name__}: {e}",
+            priority="high",
+            tags=["rotating_light"],
+        )
         return None
     finally:
         with _lock:

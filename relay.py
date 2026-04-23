@@ -33,6 +33,7 @@ except ImportError:
     exit(1)
 
 from capture import extract_frame, capture_direct
+from notifications import ping_healthcheck, push_ntfy
 from pipeline import process_event
 
 # ---------------------------------------------------------------------------
@@ -60,6 +61,10 @@ DEFAULT_CONFIG = {
         "ply_downsample": 2,
         "depth_input_size": 518,
         "colormap": "inferno",
+    },
+    "notifications": {
+        "webhook_heartbeat_url": "",
+        "ntfy_topic_url": "",
     },
 }
 
@@ -103,6 +108,8 @@ def _capture_and_process(source, event_type, lookback_override=None):
     relay = _config["relay"]
     ring = _config["ring_buffer"]
     pipe = _config["pipeline"]
+    notif = _config.get("notifications", {})
+    ntfy_url = notif.get("ntfy_topic_url") or None
 
     lookback = lookback_override if lookback_override is not None else relay["lookback_s"]
 
@@ -120,7 +127,18 @@ def _capture_and_process(source, event_type, lookback_override=None):
         )
 
     if image_data is None:
-        log.error("Failed to capture frame from any source")
+        log.error(
+            f"Failed to capture frame from any source "
+            f"(source={source}, type={event_type})"
+        )
+        push_ntfy(
+            ntfy_url,
+            "Depth Camera: capture failed",
+            f"{event_type} event from {source}, but ring buffer AND live RTSP "
+            f"both failed. Check camera reachability and /etc/depth-camera.env.",
+            priority="high",
+            tags=["warning", "camera"],
+        )
         return None
 
     return process_event(
@@ -132,6 +150,7 @@ def _capture_and_process(source, event_type, lookback_override=None):
         ply_downsample=pipe["ply_downsample"],
         depth_input_size=pipe["depth_input_size"],
         colormap=pipe["colormap"],
+        ntfy_topic_url=ntfy_url,
     )
 
 
@@ -148,6 +167,9 @@ def ifttt_webhook(path_type=None):
     data = request.get_json(silent=True) or {}
     event_type = path_type or data.get("event_type", "detection")
     source = data.get("source", "ifttt")
+
+    # Dead-man's-switch: if these stop arriving, healthchecks.io alerts us.
+    ping_healthcheck(_config.get("notifications", {}).get("webhook_heartbeat_url") or None)
 
     # If the caller provides a Unix timestamp of the actual detection,
     # compute an exact lookback instead of using the configured guess.
