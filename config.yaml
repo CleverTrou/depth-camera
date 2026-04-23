@@ -66,6 +66,23 @@ gallery:
   host: "0.0.0.0"
   port: 8080
 
+notifications:
+  # Dead-man's-switch heartbeats. Create a check at https://healthchecks.io/
+  # and paste its ping URL below. Leave empty to disable.
+  #
+  # ring_buffer: pinged every 60s while segments are flowing.
+  #   Suggested healthchecks config: period=1m, grace=2m.
+  # webhook: pinged on every incoming /ifttt POST. If Aqara detects nothing
+  #   for a long time, this will go silent and alert you.
+  #   Suggested healthchecks config: period=24h, grace=12h.
+  ring_buffer_heartbeat_url: ""
+  webhook_heartbeat_url: ""
+
+  # Active error pushes. Pick any topic name on https://ntfy.sh/ (e.g.
+  #   https://ntfy.sh/depth-camera-trevor-<random>) and subscribe to it
+  # in the ntfy iPhone/Android app. Leave empty to disable.
+  ntfy_topic_url: ""
+
 logging:
   level: "INFO"
   save_debug_frames: false

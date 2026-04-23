@@ -58,6 +58,9 @@ DEFAULT_CONFIG = {
         "depth_input_size": 518,
         "colormap": "inferno",
     },
+    "notifications": {
+        "ntfy_topic_url": "",
+    },
 }
 
 
@@ -157,6 +160,7 @@ def main():
     det = config["detection"]
     ring = config["ring_buffer"]
     pipe = config["pipeline"]
+    ntfy_url = config.get("notifications", {}).get("ntfy_topic_url") or None
 
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
@@ -232,6 +236,7 @@ def main():
                         ply_downsample=pipe["ply_downsample"],
                         depth_input_size=pipe["depth_input_size"],
                         colormap=pipe["colormap"],
+                        ntfy_topic_url=ntfy_url,
                     )
                     if result:
                         log.info(f"Event {result['event_id']} processed in {result['elapsed_s']}s")
