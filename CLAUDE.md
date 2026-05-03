@@ -63,9 +63,9 @@ services that read from there. The env file is at `/etc/depth-camera.env`
 Two channels, both optional and fail-silently (see `notifications.py`):
 
 - **Healthchecks.io** — dead-man's-switch pings for ring buffer and relay. URLs in `config.yaml` under `notifications.healthcheck_*`.
-- **ntfy** — active error pushes. Topic URL in `config.yaml` under `notifications.ntfy_topic_url`. Not committed to git; set locally on the Pi. The ntfy topic is shared with other Pi services (e.g. UxPlay update checks).
+- **ntfy** — active error pushes. Topic URL in `config.yaml` under `notifications.ntfy_topic_url`. Not committed to git; set locally on the Pi.
 
 ## Coexistence
 
-Runs alongside `family-calendar` and `uxplay` on the same Pi 5 (16GB) with no conflicts.
+Runs alongside other services on the Pi 5 with no conflicts.
 Different ports, different runtimes, plenty of RAM headroom.

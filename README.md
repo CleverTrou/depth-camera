@@ -218,7 +218,7 @@ sudo systemctl enable --now depth-monitor
 | **Total idle** | **~0%** | **~100 MB** | **0** |
 | **During event** | **~100% for 3-6s** | **~2 GB peak** | **~10 MB/event** |
 
-Leaves plenty of headroom on a 16 GB Pi 5 running alongside family-calendar.
+Leaves plenty of headroom on a 16 GB Pi 5.
 
 ## Configuration Reference
 
@@ -266,13 +266,3 @@ The relay endpoint (`/ifttt`) has no per-request authentication — [IFTTT](http
 ### Services run as a non-root user
 All systemd services run as the user who invoked `sudo ./setup.sh` (detected via `$SUDO_USER`). The data directory `/data/depth-camera` is `chown`'d to that user automatically.
 
-## Coexistence with family-calendar
-
-Both run on the same Pi 5 with no conflicts:
-
-| Resource | family-calendar | depth-camera | Conflict? |
-|----------|----------------|--------------|-----------|
-| Ports | 3000 | 8080, 9090 | No |
-| Display | X11 kiosk | Headless | No |
-| RAM (idle) | ~400 MB | ~100 MB | No |
-| RAM (peak) | ~400 MB | ~2 GB | No (16 GB Pi) |

@@ -83,7 +83,7 @@ notifications:
   webhook_heartbeat_url: ""
 
   # Active error pushes. Pick any topic name on https://ntfy.sh/ (e.g.
-  #   https://ntfy.sh/depth-camera-pi-<random>) and subscribe to it
+  #   https://ntfy.sh/depth-camera-<random>) and subscribe to it
   # in the ntfy iPhone/Android app. Leave empty to disable.
   ntfy_topic_url: ""
 
