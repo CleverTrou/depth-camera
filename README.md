@@ -65,7 +65,7 @@ we extract the frame from 5 seconds ago — when the squirrel was actually there
 |--------|------|-------------|
 | **Interactive parallax** | Web viewer | WebGL "living photo" — tilt phone or move mouse to explore depth |
 | **Depth colormap** | `depth_colormap.jpg` | Colorized visualization (warm = near, cool = far) |
-| **Point cloud** | `pointcloud.ply` | Colored 3D point cloud, opens in MeshLab/CloudCompare |
+| **Point cloud** | `pointcloud.ply` | Colored 3D point cloud, opens in [MeshLab](https://www.meshlab.net/)/[CloudCompare](https://cloudcompare.org/) |
 | **Raw depth** | `depth.npy` | Float32 numpy array for custom use |
 
 ## Requirements
@@ -75,6 +75,7 @@ we extract the frame from 5 seconds ago — when the squirrel was actually there
 - **Raspberry Pi OS** (64-bit, Bookworm)
 - **ffmpeg** (installed by setup script)
 - **Python 3.11+** (ships with Bookworm)
+- **[IFTTT](https://ifttt.com) account** (free tier is sufficient) with the [Aqara Home service](https://ifttt.com/aqara) connected
 
 No GPU, no AI accelerator, no VPS, no cloud compute account needed.
 
@@ -134,7 +135,8 @@ curl http://localhost:8080/api/status
 
 ### 5. Expose webhook for IFTTT (via Tailscale Funnel)
 
-IFTTT needs to reach the Pi from the internet. Tailscale Funnel provides
+[IFTTT](https://ifttt.com) needs to reach the Pi from the internet.
+[Tailscale Funnel](https://tailscale.com/kb/1223/funnel) provides
 encrypted HTTPS access without port forwarding:
 
 ```bash
@@ -147,8 +149,11 @@ Note the Funnel URL (e.g., `https://your-hostname.your-tailnet.ts.net`).
 
 ### 6. Set up IFTTT
 
-1. In **Aqara Home** app, enable AI detection (person, animal, etc.)
-2. In **IFTTT**, create an applet:
+1. Create a free account at [ifttt.com](https://ifttt.com) if you don't have one.
+2. Connect the **[Aqara Home](https://ifttt.com/aqara)** service to your IFTTT account
+   and authorize it with your Aqara credentials.
+3. In the **Aqara Home** app, enable AI detection (person, animal, etc.)
+4. In **IFTTT**, create an applet:
    - **If This:** Aqara Home → detection trigger
    - **Then That:** Webhooks → Make a web request
      - URL: `https://YOUR_TAILSCALE_FUNNEL_URL/ifttt`
@@ -246,8 +251,8 @@ Increase `lookback_s` if captured frames miss the detected subject.
 
 The `.ply` files are standard colored point clouds:
 
-- **Desktop:** MeshLab, CloudCompare, Blender
-- **iPhone:** MeshLab for iOS (free), 3D Point Cloud Viewer
+- **Desktop:** [MeshLab](https://www.meshlab.net/), [CloudCompare](https://cloudcompare.org/), [Blender](https://www.blender.org/)
+- **iPhone:** [MeshLab](https://www.meshlab.net/) (free, also on the iOS App Store), 3D Point Cloud Viewer
 - **Web:** Download from the gallery and open in any PLY viewer
 
 ## Security Notes
@@ -256,10 +261,10 @@ The `.ply` files are standard colored point clouds:
 The gallery binds to `0.0.0.0:8080` and serves all captured camera images. Without a PIN, anyone on your LAN can browse it. Set `gallery.pin` in `/opt/depth-camera/config.yaml` (see Quick Start step 2).
 
 ### Webhook URL is a shared secret
-The relay endpoint (`/ifttt`) has no per-request authentication — IFTTT's basic webhook doesn't support bearer tokens. Anyone who learns your Tailscale Funnel URL can trigger depth processing. Treat the URL as a secret: don't publish it, and use a non-guessable Tailscale hostname.
+The relay endpoint (`/ifttt`) has no per-request authentication — [IFTTT](https://ifttt.com)'s basic webhook doesn't support bearer tokens. Anyone who learns your [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) URL can trigger depth processing. Treat the URL as a secret: don't publish it, and use a non-guessable Tailscale hostname.
 
-### Services run as `pi`
-All systemd services run as `pi` (not root). The setup script also `chown`s `/data/depth-camera` to `pi`. If your Pi username differs, edit the `User=` lines in each `.service` file in `/etc/systemd/system/depth-*.service` and re-run `sudo systemctl daemon-reload`.
+### Services run as a non-root user
+All systemd services run as a non-root user — `setup.sh` hardcodes `User=pi`. If your Pi username is different, change `pi` to your username in `setup.sh` before running it (both the `User=` lines in the service definitions and the `chown` command near the end).
 
 ## Coexistence with family-calendar
 
