@@ -30,6 +30,8 @@ from pathlib import Path
 
 import yaml
 
+from notifications import ping_healthcheck
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -46,7 +48,12 @@ DEFAULT_CONFIG = {
         "stale_timeout": 15,
         "restart_delay": 3,
     },
+    "notifications": {
+        "ring_buffer_heartbeat_url": "",
+    },
 }
+
+HEARTBEAT_INTERVAL_S = 60
 
 
 def load_config(path):
@@ -143,6 +150,7 @@ def main():
 
     config = load_config(args.config)
     ring = config["ring_buffer"]
+    heartbeat_url = config.get("notifications", {}).get("ring_buffer_heartbeat_url") or None
     buffer_seconds = ring["segment_count"] * ring["segment_seconds"]
 
     signal.signal(signal.SIGINT, handle_signal)
@@ -173,6 +181,7 @@ def main():
 
         log.info(f"ffmpeg started (pid={proc.pid})")
         startup_grace = True
+        last_heartbeat = 0.0
 
         while running:
             time.sleep(5)
@@ -186,6 +195,10 @@ def main():
                 if startup_grace:
                     log.info("Ring buffer active — segments flowing")
                     startup_grace = False
+                now = time.time()
+                if now - last_heartbeat >= HEARTBEAT_INTERVAL_S:
+                    ping_healthcheck(heartbeat_url)
+                    last_heartbeat = now
             elif not startup_grace:
                 log.warning("Ring buffer stale — restarting ffmpeg")
                 stop_process(proc)
