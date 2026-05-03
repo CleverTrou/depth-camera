@@ -10,6 +10,8 @@ interactive parallax views, colorized depth maps, and colored point clouds.
 
 Browse the results in a web gallery on your phone or laptop.
 
+![Gallery showing a raccoon detection at night alongside its inferno depth colormap](screenshot.png)
+
 ## How It Works
 
 ```
