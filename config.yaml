@@ -65,6 +65,10 @@ gallery:
   # Local web gallery
   host: "0.0.0.0"
   port: 8080
+  # Optional PIN lock for the gallery (recommended — camera images are served
+  # unauthenticated without it). Set a 6-character value, e.g. "482916".
+  # Leave empty to disable. Change requires restarting depth-gallery.service.
+  pin: ""
 
 logging:
   level: "INFO"

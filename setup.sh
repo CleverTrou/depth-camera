@@ -80,8 +80,9 @@ else
     echo "  ✓ /etc/depth-camera.env already exists (not overwritten)"
 fi
 
-# Create data directory
+# Create data directory and give pi ownership so services can write to it
 mkdir -p /data/depth-camera/events
+chown -R pi:pi /data/depth-camera
 echo "  ✓ Installed at $INSTALL_DIR"
 
 # ---------------------------------------------------------------------------
@@ -111,7 +112,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=root
+User=pi
 WorkingDirectory=/opt/depth-camera
 EnvironmentFile=/etc/depth-camera.env
 ExecStart=/usr/bin/python3 ring_buffer.py --config config.yaml
@@ -132,7 +133,7 @@ Wants=depth-ring.service
 
 [Service]
 Type=simple
-User=root
+User=pi
 WorkingDirectory=/opt/depth-camera
 EnvironmentFile=/etc/depth-camera.env
 ExecStart=/usr/bin/python3 relay.py --config config.yaml
@@ -152,7 +153,7 @@ After=network-online.target
 
 [Service]
 Type=simple
-User=root
+User=pi
 WorkingDirectory=/opt/depth-camera
 ExecStart=/usr/bin/python3 server.py --config config.yaml
 Restart=on-failure
@@ -172,7 +173,7 @@ Wants=depth-ring.service
 
 [Service]
 Type=simple
-User=root
+User=pi
 WorkingDirectory=/opt/depth-camera
 EnvironmentFile=/etc/depth-camera.env
 ExecStart=/usr/bin/python3 monitor.py --config config.yaml

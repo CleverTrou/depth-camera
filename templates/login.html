@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Depth Camera</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+            background: #0a0a0a; color: #e0e0e0;
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        }
+        .card {
+            background: #141414; border: 1px solid #222; border-radius: 16px;
+            padding: 40px 32px; width: 100%; max-width: 300px;
+            margin: 20px;
+        }
+        h1 { font-size: 1.2rem; color: #fff; margin-bottom: 6px; }
+        p { font-size: 0.8rem; color: #555; margin-bottom: 28px; }
+        .pin-input {
+            width: 100%; background: #0a0a0a; border: 1px solid #333;
+            border-radius: 10px; padding: 14px 16px; font-size: 1.5rem;
+            letter-spacing: 0.4em; text-align: center; color: #fff;
+            outline: none;
+            -webkit-text-security: disc;
+            text-security: disc;
+        }
+        .pin-input:focus { border-color: #444; }
+        .error {
+            background: #2e1a1a; color: #ff7c7c; border-radius: 8px;
+            padding: 10px 14px; font-size: 0.8rem; margin-top: 12px;
+            text-align: center;
+        }
+        .btn {
+            width: 100%; margin-top: 16px; padding: 13px;
+            background: #1d4ed8; border: none; border-radius: 10px;
+            color: #fff; font-size: 0.9rem; font-weight: 500; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn:hover { background: #2563eb; }
+        .btn:active { background: #1e40af; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Depth Camera</h1>
+        <p>Enter PIN to continue</p>
+        <form method="POST" autocomplete="off">
+            <input class="pin-input" type="password" name="pin"
+                   inputmode="numeric" maxlength="6" autofocus
+                   placeholder="••••••">
+            {% if error %}
+            <div class="error">Incorrect PIN</div>
+            {% endif %}
+            <button class="btn" type="submit">Unlock</button>
+        </form>
+    </div>
+</body>
+</html>

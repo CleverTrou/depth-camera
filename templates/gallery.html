@@ -11,7 +11,7 @@
             background: #0a0a0a; color: #e0e0e0;
             padding: 20px; max-width: 960px; margin: 0 auto;
         }
-        header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 24px; }
+        header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
         h1 { font-size: 1.5rem; color: #fff; }
         .subtitle { color: #666; font-size: 0.85rem; }
         .live-dot {
@@ -20,6 +20,12 @@
             animation: pulse 2s ease-in-out infinite;
         }
         .live-label { font-size: 0.75rem; color: #555; }
+        .btn-logout {
+            font-size: 0.75rem; color: #555; text-decoration: none;
+            padding: 4px 10px; border: 1px solid #2a2a2a; border-radius: 6px;
+            margin-left: 12px;
+        }
+        .btn-logout:hover { color: #aaa; border-color: #444; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
         /* --- Toast for new events --- */
@@ -100,9 +106,12 @@
             <h1>Depth Camera</h1>
             <p class="subtitle">Aqara G5 Pro &rarr; Depth Anything V2 &rarr; 2.5D depth maps</p>
         </div>
-        <div>
+        <div style="display:flex; align-items:center;">
             <span class="live-dot"></span>
             <span class="live-label" id="event-count">{{ events|length }} events</span>
+            {% if pin_enabled %}
+            <a href="/logout" class="btn-logout">Lock</a>
+            {% endif %}
         </div>
     </header>
 

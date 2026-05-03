@@ -58,7 +58,14 @@ and `monitor.py`.
 services that read from there. The env file is at `/etc/depth-camera.env`
 (mode 600). IFTTT reaches the Pi via Tailscale Funnel (HTTPS, no port forwarding).
 
+## Notifications
+
+Two channels, both optional and fail-silently (see `notifications.py`):
+
+- **Healthchecks.io** — dead-man's-switch pings for ring buffer and relay. URLs in `config.yaml` under `notifications.healthcheck_*`.
+- **ntfy** — active error pushes. Topic URL in `config.yaml` under `notifications.ntfy_topic_url`. Not committed to git; set locally on the Pi. The ntfy topic is shared with other Pi services (e.g. UxPlay update checks).
+
 ## Coexistence
 
-Runs alongside `family-calendar` on the same Pi 5 (16GB) with no conflicts.
+Runs alongside `family-calendar` and `uxplay` on the same Pi 5 (16GB) with no conflicts.
 Different ports, different runtimes, plenty of RAM headroom.

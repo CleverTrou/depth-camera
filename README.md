@@ -88,9 +88,9 @@ cd ~/depth-camera
 sudo ./setup.sh
 ```
 
-### 2. Configure camera
+### 2. Configure camera and gallery PIN
 
-Set your RTSP URL in the environment file (keeps credentials out of the repo):
+Set your RTSP URL (keeps credentials out of the repo):
 
 ```bash
 sudo nano /etc/depth-camera.env
@@ -101,6 +101,20 @@ CAMERA_RTSP_URL=rtsp://USER:PASS@CAMERA_IP:8554/stream_path
 ```
 
 Find your Aqara G5 Pro's URL in: Aqara App → Camera → Settings → RTSP.
+
+Set a gallery PIN in the installed config (the gallery serves camera images
+to anyone on your LAN without it):
+
+```bash
+sudo nano /opt/depth-camera/config.yaml
+```
+
+```yaml
+gallery:
+  pin: "482916"   # pick any 6-character PIN
+```
+
+Restart the gallery service after editing: `sudo systemctl restart depth-gallery`
 
 ### 3. Start
 
@@ -235,6 +249,17 @@ The `.ply` files are standard colored point clouds:
 - **Desktop:** MeshLab, CloudCompare, Blender
 - **iPhone:** MeshLab for iOS (free), 3D Point Cloud Viewer
 - **Web:** Download from the gallery and open in any PLY viewer
+
+## Security Notes
+
+### Gallery PIN
+The gallery binds to `0.0.0.0:8080` and serves all captured camera images. Without a PIN, anyone on your LAN can browse it. Set `gallery.pin` in `/opt/depth-camera/config.yaml` (see Quick Start step 2).
+
+### Webhook URL is a shared secret
+The relay endpoint (`/ifttt`) has no per-request authentication — IFTTT's basic webhook doesn't support bearer tokens. Anyone who learns your Tailscale Funnel URL can trigger depth processing. Treat the URL as a secret: don't publish it, and use a non-guessable Tailscale hostname.
+
+### Services run as `pi`
+All systemd services run as `pi` (not root). The setup script also `chown`s `/data/depth-camera` to `pi`. If your Pi username differs, edit the `User=` lines in each `.service` file in `/etc/systemd/system/depth-*.service` and re-run `sudo systemctl daemon-reload`.
 
 ## Coexistence with family-calendar
 

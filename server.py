@@ -13,13 +13,19 @@ Usage:
 """
 
 import argparse
+import hashlib
 import json
 import logging
 import os
+import re
+from functools import wraps
 from pathlib import Path
 
 import yaml
-from flask import Flask, jsonify, send_from_directory, render_template
+from flask import (
+    Flask, jsonify, redirect, render_template,
+    request, send_from_directory, session, url_for,
+)
 
 # ---------------------------------------------------------------------------
 # Config
@@ -29,6 +35,7 @@ DEFAULT_CONFIG = {
     "gallery": {
         "host": "0.0.0.0",
         "port": 8080,
+        "pin": "",
     },
     "pipeline": {
         "data_dir": "/data/depth-camera",
@@ -63,10 +70,65 @@ log = logging.getLogger("gallery")
 app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
 _config = {}
 
+# Event IDs are always generated as YYYYMMDD_HHMMSS_xxxxxxxx (6 hex chars).
+# Validate before using as a filesystem path component.
+_EVENT_ID_RE = re.compile(r'^\d{8}_\d{6}_[0-9a-f]{6}$')
+
+
+def _valid_event_id(event_id: str) -> bool:
+    return bool(_EVENT_ID_RE.match(event_id))
+
 
 def _events_dir() -> Path:
     return Path(_config["pipeline"]["data_dir"]) / "events"
 
+
+def _get_pin() -> str:
+    return str(_config.get("gallery", {}).get("pin", "") or "")
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+def _require_pin(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if _get_pin() and not session.get("authenticated"):
+            return redirect(url_for("login_page", next=request.path))
+        return f(*args, **kwargs)
+    return wrapper
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login_page():
+    pin = _get_pin()
+    if not pin:
+        return redirect(url_for("gallery"))
+
+    error = False
+    if request.method == "POST":
+        if request.form.get("pin", "") == pin:
+            session["authenticated"] = True
+            next_url = request.args.get("next", "/")
+            # Only allow same-origin relative paths to prevent open redirect.
+            if not next_url.startswith("/") or next_url.startswith("//"):
+                next_url = "/"
+            return redirect(next_url)
+        error = True
+
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.pop("authenticated", None)
+    return redirect(url_for("login_page"))
+
+
+# ---------------------------------------------------------------------------
+# Event helpers
+# ---------------------------------------------------------------------------
 
 def _get_events() -> list[dict]:
     """Scan the events directory and return metadata for all events."""
@@ -85,7 +147,6 @@ def _get_events() -> list[dict]:
         ply = event_dir / "pointcloud.ply"
         meta_file = event_dir / "metadata.json"
 
-        # Read saved metadata if available
         meta = {}
         if meta_file.exists():
             try:
@@ -109,60 +170,86 @@ def _get_events() -> list[dict]:
     return events
 
 
-# --- Gallery page ---
+# ---------------------------------------------------------------------------
+# Routes — Gallery page
+# ---------------------------------------------------------------------------
 
 @app.route("/")
+@_require_pin
 def gallery():
     events = _get_events()
-    return render_template("gallery.html", events=events)
+    pin_enabled = bool(_get_pin())
+    return render_template("gallery.html", events=events, pin_enabled=pin_enabled)
 
 
-# --- Parallax viewer ---
+# ---------------------------------------------------------------------------
+# Routes — Parallax viewer
+# ---------------------------------------------------------------------------
 
 @app.route("/events/<event_id>/viewer")
+@_require_pin
 def viewer(event_id):
+    if not _valid_event_id(event_id):
+        return "Not found", 404
     event_dir = _events_dir() / event_id
     if not event_dir.exists():
         return "Event not found", 404
     return render_template("viewer.html", event_id=event_id)
 
 
-# --- Static file serving ---
+# ---------------------------------------------------------------------------
+# Routes — Static file serving
+# ---------------------------------------------------------------------------
 
 @app.route("/events/<event_id>/snapshot.jpg")
+@_require_pin
 def serve_snapshot(event_id):
+    if not _valid_event_id(event_id):
+        return "Not found", 404
     return send_from_directory(str(_events_dir() / event_id), "snapshot.jpg")
 
 
 @app.route("/events/<event_id>/depth_colormap.jpg")
+@_require_pin
 def serve_colormap(event_id):
+    if not _valid_event_id(event_id):
+        return "Not found", 404
     return send_from_directory(str(_events_dir() / event_id), "depth_colormap.jpg")
 
 
 @app.route("/events/<event_id>/depth_map.png")
+@_require_pin
 def serve_depth_map(event_id):
+    if not _valid_event_id(event_id):
+        return "Not found", 404
     return send_from_directory(str(_events_dir() / event_id), "depth_map.png")
 
 
 @app.route("/events/<event_id>/pointcloud.ply")
+@_require_pin
 def serve_ply(event_id):
-    directory = str(_events_dir() / event_id)
+    if not _valid_event_id(event_id):
+        return "Not found", 404
     return send_from_directory(
-        directory, "pointcloud.ply",
+        str(_events_dir() / event_id), "pointcloud.ply",
         mimetype="application/x-ply",
         as_attachment=True,
         download_name=f"{event_id}.ply",
     )
 
 
-# --- API ---
+# ---------------------------------------------------------------------------
+# Routes — API
+# ---------------------------------------------------------------------------
 
 @app.route("/api/events")
+@_require_pin
 def api_events():
     return jsonify(_get_events())
 
 
 @app.route("/api/status")
+@_require_pin
 def api_status():
     events = _get_events()
     return jsonify({
@@ -186,13 +273,22 @@ def main():
     gallery_cfg = _config["gallery"]
     data_dir = _config["pipeline"]["data_dir"]
 
-    # Ensure data directory exists
+    pin = _get_pin()
+    if pin:
+        # Derive a stable secret key from the PIN so sessions survive restarts
+        # and are automatically invalidated if the PIN changes.
+        app.secret_key = hashlib.sha256(f"depth-camera:{pin}".encode()).digest()
+    else:
+        # Sessions aren't used without a PIN, but Flask requires a key.
+        app.secret_key = os.urandom(24)
+
     (_events_dir()).mkdir(parents=True, exist_ok=True)
 
     log.info("=" * 50)
     log.info("Depth Camera — Gallery Server")
     log.info(f"  Listening: :{gallery_cfg['port']}")
     log.info(f"  Data dir:  {data_dir}")
+    log.info(f"  PIN auth:  {'enabled' if pin else 'disabled (set gallery.pin in config.yaml)'}")
     log.info("=" * 50)
 
     app.run(
