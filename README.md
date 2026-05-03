@@ -264,7 +264,7 @@ The gallery binds to `0.0.0.0:8080` and serves all captured camera images. Witho
 The relay endpoint (`/ifttt`) has no per-request authentication — [IFTTT](https://ifttt.com)'s basic webhook doesn't support bearer tokens. Anyone who learns your [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) URL can trigger depth processing. Treat the URL as a secret: don't publish it, and use a non-guessable Tailscale hostname.
 
 ### Services run as a non-root user
-All systemd services run as a non-root user — `setup.sh` hardcodes `User=pi`. If your Pi username is different, change `pi` to your username in `setup.sh` before running it (both the `User=` lines in the service definitions and the `chown` command near the end).
+All systemd services run as the user who invoked `sudo ./setup.sh` (detected via `$SUDO_USER`). The data directory `/data/depth-camera` is `chown`'d to that user automatically.
 
 ## Coexistence with family-calendar
 

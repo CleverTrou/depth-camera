@@ -17,6 +17,13 @@
 
 set -euo pipefail
 
+# Detect the user who invoked sudo — services will run as this user.
+SERVICE_USER="${SUDO_USER:-}"
+if [[ -z "$SERVICE_USER" ]]; then
+    echo "Run with sudo: sudo ./setup.sh"
+    exit 1
+fi
+
 echo "=========================================="
 echo "  Depth Camera — Pi Setup"
 echo "=========================================="
@@ -80,9 +87,9 @@ else
     echo "  ✓ /etc/depth-camera.env already exists (not overwritten)"
 fi
 
-# Create data directory and give pi ownership so services can write to it
+# Create data directory and give the service user ownership so services can write to it
 mkdir -p /data/depth-camera/events
-chown -R pi:pi /data/depth-camera
+chown -R "$SERVICE_USER:$SERVICE_USER" /data/depth-camera
 echo "  ✓ Installed at $INSTALL_DIR"
 
 # ---------------------------------------------------------------------------
@@ -104,7 +111,7 @@ echo ""
 echo "[5/5] Installing systemd services..."
 
 # --- Ring buffer ---
-cat > /etc/systemd/system/depth-ring.service << 'UNIT'
+cat > /etc/systemd/system/depth-ring.service << UNIT
 [Unit]
 Description=Depth Camera — RTSP Ring Buffer
 After=network-online.target
@@ -112,7 +119,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
+User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
 EnvironmentFile=/etc/depth-camera.env
 ExecStart=/usr/bin/python3 ring_buffer.py --config config.yaml
@@ -125,7 +132,7 @@ WantedBy=multi-user.target
 UNIT
 
 # --- IFTTT relay ---
-cat > /etc/systemd/system/depth-relay.service << 'UNIT'
+cat > /etc/systemd/system/depth-relay.service << UNIT
 [Unit]
 Description=Depth Camera — IFTTT Relay + Depth Processing
 After=network-online.target depth-ring.service
@@ -133,7 +140,7 @@ Wants=depth-ring.service
 
 [Service]
 Type=simple
-User=pi
+User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
 EnvironmentFile=/etc/depth-camera.env
 ExecStart=/usr/bin/python3 relay.py --config config.yaml
@@ -146,14 +153,14 @@ WantedBy=multi-user.target
 UNIT
 
 # --- Gallery server ---
-cat > /etc/systemd/system/depth-gallery.service << 'UNIT'
+cat > /etc/systemd/system/depth-gallery.service << UNIT
 [Unit]
 Description=Depth Camera — Web Gallery
 After=network-online.target
 
 [Service]
 Type=simple
-User=pi
+User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
 ExecStart=/usr/bin/python3 server.py --config config.yaml
 Restart=on-failure
@@ -165,7 +172,7 @@ WantedBy=multi-user.target
 UNIT
 
 # --- Motion monitor (optional) ---
-cat > /etc/systemd/system/depth-monitor.service << 'UNIT'
+cat > /etc/systemd/system/depth-monitor.service << UNIT
 [Unit]
 Description=Depth Camera — Local Motion Monitor (Fallback)
 After=network-online.target depth-ring.service
@@ -173,7 +180,7 @@ Wants=depth-ring.service
 
 [Service]
 Type=simple
-User=pi
+User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
 EnvironmentFile=/etc/depth-camera.env
 ExecStart=/usr/bin/python3 monitor.py --config config.yaml
