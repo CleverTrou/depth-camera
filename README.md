@@ -56,10 +56,10 @@ Browse the results in a web gallery on your phone or laptop.
 
 ### Ring Buffer: Why Timing Matters
 
-The camera detects a squirrel at T=0. The IFTTT notification reaches the Pi
+The camera detects an opossum at T=0. The IFTTT notification reaches the Pi
 at T=5-7s. Without a ring buffer, you'd capture an empty patio. The ring
 buffer continuously records the last 16 seconds, so when the webhook arrives,
-we extract the frame from 5 seconds ago — when the squirrel was actually there.
+we extract the frame from 5 seconds ago — when the opossum was actually there.
 
 ## Output Formats
 
