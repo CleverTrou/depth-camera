@@ -689,6 +689,8 @@ async function mountCloud() {
   loader.load(
     '/events/' + ev.event_id + '/pointcloud.ply',
     function(geometry) {
+      // PLY uses image coords (Y-down, Z-positive=far). Flip to Three.js (Y-up, Z-negative=far).
+      geometry.scale(1, -1, -1);
       geometry.computeBoundingBox();
       const box = geometry.boundingBox;
       const center = new T.Vector3();
