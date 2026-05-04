@@ -183,8 +183,32 @@ def gallery():
 
 
 # ---------------------------------------------------------------------------
-# Routes — Parallax viewer
+# Routes — Viewer
 # ---------------------------------------------------------------------------
+
+def _get_event_meta(event_id: str) -> dict:
+    """Load metadata for a single event without scanning the full directory."""
+    event_dir = _events_dir() / event_id
+    meta: dict = {}
+    meta_file = event_dir / "metadata.json"
+    if meta_file.exists():
+        try:
+            meta = json.loads(meta_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+    ply = event_dir / "pointcloud.ply"
+    return {
+        "event_id": event_id,
+        "has_snapshot": (event_dir / "snapshot.jpg").exists(),
+        "has_colormap": (event_dir / "depth_colormap.jpg").exists(),
+        "has_ply": ply.exists(),
+        "ply_size": ply.stat().st_size if ply.exists() else 0,
+        "event_type": meta.get("event_type", ""),
+        "source": meta.get("source", ""),
+        "timestamp": meta.get("timestamp", ""),
+        "elapsed_s": meta.get("elapsed_s", 0),
+    }
+
 
 @app.route("/events/<event_id>/viewer")
 @_require_pin
@@ -194,7 +218,8 @@ def viewer(event_id):
     event_dir = _events_dir() / event_id
     if not event_dir.exists():
         return "Event not found", 404
-    return render_template("viewer.html", event_id=event_id)
+    event = _get_event_meta(event_id)
+    return render_template("viewer.html", event_id=event_id, event=event)
 
 
 # ---------------------------------------------------------------------------
