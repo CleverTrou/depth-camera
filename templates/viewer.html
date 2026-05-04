@@ -526,26 +526,33 @@ async function mountParallax() {
   canvas.addEventListener('touchstart', onTouch, {passive:false});
   canvas.addEventListener('touchmove',  onTouch, {passive:false});
 
-  // Gyro: Android fires freely; iOS 13+ needs requestPermission on user gesture
+  // Gyro: Android fires freely; iOS 13+ needs requestPermission on user gesture.
+  // Show the tap prompt regardless of protocol — iOS decides whether to grant.
+  // On HTTP it may deny, but not showing the prompt at all is worse.
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const isSecure  = location.protocol==='https:' || location.hostname==='localhost';
   if (isMobile && typeof DeviceOrientationEvent !== 'undefined') {
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-      if (isSecure) {
-        // Show tap-to-enable prompt
-        const gyroPrompt = document.createElement('button');
-        gyroPrompt.className = 'stage-msg';
-        gyroPrompt.style.cssText = 'pointer-events:auto;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:20px 32px;cursor:pointer;';
-        gyroPrompt.textContent = 'Tap to enable gyroscope';
-        stage.appendChild(gyroPrompt);
-        gyroPrompt.onclick = function() {
-          DeviceOrientationEvent.requestPermission().then(function(r) {
-            gyroPrompt.remove();
-            if (r==='granted') window.addEventListener('deviceorientation', onOrient);
-          }).catch(function() { gyroPrompt.remove(); });
-        };
-      }
+      const gyroPrompt = document.createElement('button');
+      gyroPrompt.className = 'stage-msg';
+      gyroPrompt.style.cssText = 'pointer-events:auto;background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.15);border-radius:10px;padding:20px 32px;cursor:pointer;font-family:var(--font-mono);font-size:13px;color:#fff;line-height:1.5;text-align:center;';
+      gyroPrompt.textContent = 'Tap to enable gyroscope';
+      stage.appendChild(gyroPrompt);
+      gyroPrompt.onclick = function() {
+        DeviceOrientationEvent.requestPermission().then(function(r) {
+          gyroPrompt.remove();
+          if (r === 'granted') {
+            window.addEventListener('deviceorientation', onOrient);
+          } else {
+            modeLabel.textContent = 'PARALLAX · gyro denied';
+          }
+        }).catch(function(err) {
+          gyroPrompt.remove();
+          // Likely HTTP — iOS blocks permission on non-secure origins
+          modeLabel.textContent = 'PARALLAX · HTTPS needed for gyro';
+        });
+      };
     } else {
+      // Android / older iOS — fires without permission
       window.addEventListener('deviceorientation', onOrient);
     }
   }
