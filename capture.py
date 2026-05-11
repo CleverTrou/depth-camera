@@ -80,15 +80,19 @@ def extract_frame(
             f"using newest complete segment ({best.name}, {age:.0f}s old)"
         )
 
-    # Concatenate the target segment with the one before it. H.264 uses
-    # keyframes (I-frames) every few seconds — if the camera's GOP interval
-    # exceeds 2s, a single segment may not contain a keyframe, causing
-    # smeared/corrupt frames. Feeding ffmpeg two consecutive segments
-    # guarantees at least one keyframe to decode from.
+    # Prepend preceding segments so ffmpeg always sees a keyframe before our
+    # target. H.264 P/B-frames decoded without their reference I-frame produce
+    # the smeared/ghosted artifacts we used to see in the gallery. The Aqara
+    # G5 Pro's GOP can be 2-4s (sometimes longer when bitrate is low), so a
+    # single 2s segment isn't always self-contained. Feeding ~8s of footage
+    # covers the realistic worst case while still finishing in <1s on the Pi.
+    _PREPEND_MAX = 3
     feed_segments = []
     if best_idx is not None and best_idx > 0:
-        feed_segments.append(candidates[best_idx - 1])
-        seek_pos += segment_seconds  # offset past prepended segment
+        start = max(0, best_idx - _PREPEND_MAX)
+        prepended = candidates[start:best_idx]
+        feed_segments.extend(prepended)
+        seek_pos += len(prepended) * segment_seconds
     feed_segments.append(best)
 
     concat_file = None
