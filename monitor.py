@@ -72,6 +72,8 @@ def load_config(path):
         _deep_merge(config, user)
     if os.environ.get("CAMERA_RTSP_URL"):
         config["camera"]["rtsp_url"] = os.environ["CAMERA_RTSP_URL"]
+    if os.environ.get("NTFY_TOPIC_ALERTS"):
+        config["notifications"]["ntfy_topic_url"] = os.environ["NTFY_TOPIC_ALERTS"]
     return config
 
 

@@ -48,22 +48,27 @@ for f in *.py; do python3 -c "import py_compile; py_compile.compile('$f', dorais
 All configuration lives in `config.yaml`. The Python files have inline
 `DEFAULT_CONFIG` dicts that mirror the YAML structure — keep them in sync.
 
-**Secrets**: The RTSP URL (contains camera credentials) is loaded from the
-environment variable `CAMERA_RTSP_URL`, set in `/etc/depth-camera.env` on the
-Pi. The `config.yaml` in the repo has only placeholder values. Never commit
-real credentials. The env var override is in `ring_buffer.py`, `relay.py`,
-and `monitor.py`.
+**Secrets**: Two env-driven values, both loaded via systemd `EnvironmentFile=`.
+The `config.yaml` in the repo has only placeholder values (empty string for the
+ntfy topic). Never commit real credentials.
+
+- `CAMERA_RTSP_URL` (camera credentials) — set in `/etc/depth-camera.env` on the
+  Pi (mode 0600 root:root). Override is in `ring_buffer.py`, `relay.py`, `monitor.py`.
+- `NTFY_TOPIC_ALERTS` (ntfy push topic for active error alerts) — set in
+  `/etc/ntfy.env` on the Pi (mode 0640 root:trevor). Override is in `relay.py`
+  and `monitor.py`. Same `if os.environ.get(...): config[...] = ...` pattern.
 
 **Deployment**: `setup.sh` installs to `/opt/depth-camera/` and creates systemd
-services that read from there. The env file is at `/etc/depth-camera.env`
-(mode 600). IFTTT reaches the Pi via Tailscale Funnel (HTTPS, no port forwarding).
+services that read from there. Each service's unit has both
+`EnvironmentFile=/etc/depth-camera.env` and `EnvironmentFile=/etc/ntfy.env`.
+IFTTT reaches the Pi via Tailscale Funnel (HTTPS, no port forwarding).
 
 ## Notifications
 
 Two channels, both optional and fail-silently (see `notifications.py`):
 
 - **Healthchecks.io** — dead-man's-switch pings for ring buffer and relay. URLs in `config.yaml` under `notifications.healthcheck_*`.
-- **ntfy** — active error pushes. Topic URL in `config.yaml` under `notifications.ntfy_topic_url`. Not committed to git; set locally on the Pi.
+- **ntfy** — active error pushes. Topic URL comes from the `NTFY_TOPIC_ALERTS` env var (set in `/etc/ntfy.env` on the Pi). Falls back to `notifications.ntfy_topic_url` in `config.yaml`, which is intentionally empty in the committed copy. The topic value is never in any tracked file — keeps it out of GitHub.
 
 ## Coexistence
 
