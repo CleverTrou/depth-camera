@@ -74,6 +74,11 @@ _config = {}
 # Validate before using as a filesystem path component.
 _EVENT_ID_RE = re.compile(r'^\d{8}_\d{6}_[0-9a-f]{6}$')
 
+# The gallery is curated to the Aqara → IFTTT pipeline only; the local
+# pi_monitor service is a coarse pixel-diff fallback and its events
+# (source="pi_monitor") are hidden so they don't pollute the timeline.
+_GALLERY_SOURCES = {"ifttt"}
+
 
 def _valid_event_id(event_id: str) -> bool:
     return bool(_EVENT_ID_RE.match(event_id))
@@ -131,7 +136,7 @@ def logout():
 # ---------------------------------------------------------------------------
 
 def _get_events() -> list[dict]:
-    """Scan the events directory and return metadata for all events."""
+    """Scan the events directory and return metadata for gallery-visible events."""
     events_dir = _events_dir()
     if not events_dir.exists():
         return []
@@ -153,6 +158,9 @@ def _get_events() -> list[dict]:
                 meta = json.loads(meta_file.read_text())
             except (json.JSONDecodeError, OSError):
                 pass
+
+        if meta.get("source") not in _GALLERY_SOURCES:
+            continue
 
         events.append({
             "event_id": event_dir.name,
@@ -219,6 +227,8 @@ def viewer(event_id):
     if not event_dir.exists():
         return "Event not found", 404
     event = _get_event_meta(event_id)
+    if event.get("source") not in _GALLERY_SOURCES:
+        return "Event not found", 404
     return render_template("viewer.html", event_id=event_id, event=event)
 
 
