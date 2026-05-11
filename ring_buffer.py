@@ -64,6 +64,8 @@ def load_config(path):
         _deep_merge(config, user)
     if os.environ.get("CAMERA_RTSP_URL"):
         config["camera"]["rtsp_url"] = os.environ["CAMERA_RTSP_URL"]
+    if os.environ.get("HEALTHCHECK_RING_BUFFER_URL"):
+        config["notifications"]["ring_buffer_heartbeat_url"] = os.environ["HEALTHCHECK_RING_BUFFER_URL"]
     return config
 
 

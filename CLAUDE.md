@@ -48,12 +48,18 @@ for f in *.py; do python3 -c "import py_compile; py_compile.compile('$f', dorais
 All configuration lives in `config.yaml`. The Python files have inline
 `DEFAULT_CONFIG` dicts that mirror the YAML structure — keep them in sync.
 
-**Secrets**: Two env-driven values, both loaded via systemd `EnvironmentFile=`.
-The `config.yaml` in the repo has only placeholder values (empty string for the
-ntfy topic). Never commit real credentials.
+**Secrets**: Four env-driven values, all loaded via systemd `EnvironmentFile=`.
+The `config.yaml` in the repo has only placeholder values (empty strings for
+the ntfy topic and both healthcheck URLs). Never commit real credentials.
 
 - `CAMERA_RTSP_URL` (camera credentials) — set in `/etc/depth-camera.env` on the
   Pi (mode 0600 root:root). Override is in `ring_buffer.py`, `relay.py`, `monitor.py`.
+- `HEALTHCHECK_RING_BUFFER_URL` (healthchecks.io dead-man's-switch ping URL,
+  fired every ~60s while ring-buffer segments are flowing) — set in
+  `/etc/depth-camera.env`. Override is in `ring_buffer.py`.
+- `HEALTHCHECK_WEBHOOK_URL` (healthchecks.io URL, pinged on each `/ifttt` POST so
+  long quiet periods trigger an alert) — set in `/etc/depth-camera.env`.
+  Override is in `relay.py`.
 - `NTFY_TOPIC_ALERTS` (ntfy push topic for active error alerts) — set in
   `/etc/ntfy.env` on the Pi (mode 0640 root:trevor). Override is in `relay.py`
   and `monitor.py`. Same `if os.environ.get(...): config[...] = ...` pattern.
@@ -67,7 +73,7 @@ IFTTT reaches the Pi via Tailscale Funnel (HTTPS, no port forwarding).
 
 Two channels, both optional and fail-silently (see `notifications.py`):
 
-- **Healthchecks.io** — dead-man's-switch pings for ring buffer and relay. URLs in `config.yaml` under `notifications.healthcheck_*`.
+- **Healthchecks.io** — dead-man's-switch pings. `ring_buffer.py` pings `notifications.ring_buffer_heartbeat_url` every ~60s while segments are flowing; `relay.py` pings `notifications.webhook_heartbeat_url` on each `/ifttt` POST. Both URLs come from env vars (`HEALTHCHECK_RING_BUFFER_URL`, `HEALTHCHECK_WEBHOOK_URL`) set in `/etc/depth-camera.env`. Committed `config.yaml` has them empty so the URLs stay out of git.
 - **ntfy** — active error pushes. Topic URL comes from the `NTFY_TOPIC_ALERTS` env var (set in `/etc/ntfy.env` on the Pi). Falls back to `notifications.ntfy_topic_url` in `config.yaml`, which is intentionally empty in the committed copy. The topic value is never in any tracked file — keeps it out of GitHub.
 
 ## Coexistence

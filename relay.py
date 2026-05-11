@@ -79,6 +79,8 @@ def load_config(path):
         config["camera"]["rtsp_url"] = os.environ["CAMERA_RTSP_URL"]
     if os.environ.get("NTFY_TOPIC_ALERTS"):
         config["notifications"]["ntfy_topic_url"] = os.environ["NTFY_TOPIC_ALERTS"]
+    if os.environ.get("HEALTHCHECK_WEBHOOK_URL"):
+        config["notifications"]["webhook_heartbeat_url"] = os.environ["HEALTHCHECK_WEBHOOK_URL"]
     return config
 
 
