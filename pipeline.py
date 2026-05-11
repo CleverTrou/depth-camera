@@ -161,12 +161,25 @@ def process_event(
 
 
 def _cleanup_old_events(events_dir: Path, max_events: int):
-    """Remove oldest events beyond the configured maximum."""
-    all_events = sorted(
-        [d for d in events_dir.iterdir() if d.is_dir()],
-        key=lambda p: p.name,
-        reverse=True,
-    )
-    for old_dir in all_events[max_events:]:
-        shutil.rmtree(old_dir, ignore_errors=True)
-        log.info(f"Cleaned up old event: {old_dir.name}")
+    """Remove oldest events beyond max_events, applied independently per source.
+
+    Each trigger source (ifttt, pi_monitor, …) gets its own quota so a noisy
+    fallback can't evict events from the curated IFTTT feed and vice versa.
+    """
+    by_source: dict[str, list[Path]] = {}
+    for d in sorted(events_dir.iterdir(), key=lambda p: p.name, reverse=True):
+        if not d.is_dir():
+            continue
+        source = "unknown"
+        meta_file = d / "metadata.json"
+        if meta_file.exists():
+            try:
+                source = json.loads(meta_file.read_text()).get("source", "unknown")
+            except (json.JSONDecodeError, OSError):
+                pass
+        by_source.setdefault(source, []).append(d)
+
+    for source, dirs in by_source.items():
+        for old_dir in dirs[max_events:]:
+            shutil.rmtree(old_dir, ignore_errors=True)
+            log.info(f"Cleaned up old event ({source}): {old_dir.name}")
