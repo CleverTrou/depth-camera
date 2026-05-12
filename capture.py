@@ -95,6 +95,15 @@ def extract_frame(
         seek_pos += len(prepended) * segment_seconds
     feed_segments.append(best)
 
+    # If target_time lands at a segment boundary (common for monitor.py's
+    # lookback_s=2 with 2s segments), seek_pos can equal the concat'd stream
+    # duration exactly, and ffmpeg returns EINVAL (rc=234) on the seek. Pull
+    # back by a small epsilon — 0.2s is enough headroom for a 5 fps stream
+    # (one frame interval) while losing minimal timing accuracy at the
+    # camera's actual 15-25 fps.
+    estimated_stream_s = len(feed_segments) * segment_seconds
+    seek_pos = max(0.0, min(seek_pos, estimated_stream_s - 0.2))
+
     concat_file = None
     try:
         if len(feed_segments) > 1:
@@ -165,9 +174,17 @@ def capture_direct(
     Only used when the ring buffer is unavailable.
     """
     log.info("Attempting direct RTSP capture (fallback — live frame)...")
+    # -skip_frame nonkey tells the input decoder to discard everything that
+    # isn't an I-frame, so the first frame ffmpeg emits is guaranteed to be
+    # a self-contained keyframe. Without this, the very first decoded frame
+    # off a freshly-opened RTSP stream is often a P/B-frame whose reference
+    # I-frame hasn't arrived yet — that's the smeared/ghosted output we used
+    # to see in the gallery. Positioned before -i so it configures the
+    # decoder rather than the MJPEG encoder on the output side.
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
         "-rtsp_transport", transport,
+        "-skip_frame", "nonkey",
         "-i", rtsp_url,
         "-vframes", "1",
         "-q:v", str(quality),
