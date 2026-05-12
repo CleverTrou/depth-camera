@@ -22,6 +22,7 @@ import sys
 import time
 from pathlib import Path
 
+import numpy as np
 import yaml
 
 from capture import extract_frame, capture_direct
@@ -133,25 +134,17 @@ def compute_frame_diff(frame_a, frame_b, threshold):
     if len(frame_a) != len(frame_b):
         return 0.0, 0.0
 
-    n_pixels = len(frame_a) // 3
-    signed_diffs = []
-    total_signed = 0
-    total_abs = 0
+    a = np.frombuffer(frame_a, dtype=np.uint8).reshape(-1, 3).mean(axis=1)
+    b = np.frombuffer(frame_b, dtype=np.uint8).reshape(-1, 3).mean(axis=1)
 
-    for i in range(0, len(frame_a), 3):
-        la = (frame_a[i] + frame_a[i + 1] + frame_a[i + 2]) // 3
-        lb = (frame_b[i] + frame_b[i + 1] + frame_b[i + 2]) // 3
-        sd = la - lb
-        signed_diffs.append(sd)
-        total_signed += sd
-        total_abs += abs(sd)
+    diffs = a - b
+    total_abs_mean = float(np.abs(diffs).mean())
 
     # mean_signed captures global brightness shift (auto-exposure, sunrise, etc.)
-    mean_signed = total_signed / n_pixels
+    mean_signed = float(diffs.mean())
+    changed_count = int(np.sum(np.abs(diffs - mean_signed) > threshold))
 
-    changed = sum(1 for sd in signed_diffs if abs(sd - mean_signed) > threshold)
-
-    return total_abs / n_pixels, (changed / n_pixels) * 100
+    return total_abs_mean, (changed_count / len(a)) * 100
 
 
 # ---------------------------------------------------------------------------

@@ -312,7 +312,9 @@ const stage = document.getElementById('js-stage');
 const dock  = document.getElementById('js-dock');
 
 // ── State ─────────────────────────────────────────────────────────────────
-let mode    = localStorage.getItem('viewer-mode') || 'parallax';
+const _VALID_MODES = new Set(['parallax', 'depth', 'cloud', 'xr']);
+const _savedMode = localStorage.getItem('viewer-mode');
+let mode    = (_savedMode && _VALID_MODES.has(_savedMode)) ? _savedMode : 'parallax';
 let cleanup = null;   // current mode cleanup fn
 let xrBanner = null;  // auto-XR banner element
 
@@ -429,9 +431,20 @@ async function mountParallax() {
     ]), gl.DYNAMIC_DRAW);
   }
 
+  const loadOverlay = document.createElement('div');
+  loadOverlay.className = 'stage-msg mono';
+  loadOverlay.textContent = 'Loading…';
+  stage.appendChild(loadOverlay);
+
   let loaded = 0;
   let raf;
-  function tryStart() { if (loaded >= 2) { updateQuad(); render(); } }
+  function tryStart() {
+    if (loaded >= 2) {
+      loadOverlay.remove();
+      updateQuad();
+      render();
+    }
+  }
 
   function loadTex(unit, url, onImg) {
     const tex = gl.createTexture();
@@ -861,6 +874,15 @@ async function mountXr() {
 // ── Init ──────────────────────────────────────────────────────────────────
 updateDock();
 switchMode(mode);
+
+// iOS Safari restores pages from BFCache on back/forward nav — scripts don't
+// re-run, leaving the dock unhighlighted and stage empty. Re-mount on restore.
+window.addEventListener('pageshow', function(e) {
+  if (e.persisted && !cleanup) {
+    updateDock();
+    switchMode(mode);
+  }
+});
 </script>
 </body>
 </html>
