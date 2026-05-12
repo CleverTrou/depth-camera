@@ -95,6 +95,14 @@ def extract_frame(
         seek_pos += len(prepended) * segment_seconds
     feed_segments.append(best)
 
+    # If target_time lands at a segment boundary (common for monitor.py's
+    # lookback_s=2 with 2s segments), seek_pos can equal the concat'd stream
+    # duration exactly, and ffmpeg returns EINVAL (rc=234) on the seek. Pull
+    # back just enough to guarantee headroom — half a second sacrifices a
+    # frame or two of timing accuracy but avoids the failure entirely.
+    estimated_stream_s = len(feed_segments) * segment_seconds
+    seek_pos = max(0.0, min(seek_pos, estimated_stream_s - 0.5))
+
     concat_file = None
     try:
         if len(feed_segments) > 1:
@@ -165,10 +173,15 @@ def capture_direct(
     Only used when the ring buffer is unavailable.
     """
     log.info("Attempting direct RTSP capture (fallback — live frame)...")
+    # -ss 1.5 after -i discards the first 1.5s of the freshly-opened stream.
+    # Without it, ffmpeg often emits a P/B-frame whose reference I-frame
+    # hasn't been received yet, producing the smeared/ghosted snapshots we
+    # see in the gallery when extract_frame falls back to this path.
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
         "-rtsp_transport", transport,
         "-i", rtsp_url,
+        "-ss", "1.5",
         "-vframes", "1",
         "-q:v", str(quality),
         "-f", "image2pipe",
