@@ -74,10 +74,11 @@ _config = {}
 # Validate before using as a filesystem path component.
 _EVENT_ID_RE = re.compile(r'^\d{8}_\d{6}_[0-9a-f]{6}$')
 
-# The gallery is curated to the Aqara → IFTTT pipeline only; the local
-# pi_monitor service is a coarse pixel-diff fallback and its events
-# (source="pi_monitor") are hidden so they don't pollute the timeline.
-_GALLERY_SOURCES = {"ifttt"}
+# The gallery defaults to showing only Aqara → IFTTT events; pi_monitor
+# (coarse pixel-diff fallback) events are loaded but hidden behind a UI
+# toggle so they don't pollute the timeline. The filter happens client-side
+# in gallery.html so the existing PIN-protected event URLs keep working.
+_DEFAULT_GALLERY_SOURCES = ["ifttt"]
 
 
 def _valid_event_id(event_id: str) -> bool:
@@ -159,9 +160,6 @@ def _get_events() -> list[dict]:
             except (json.JSONDecodeError, OSError):
                 pass
 
-        if meta.get("source") not in _GALLERY_SOURCES:
-            continue
-
         events.append({
             "event_id": event_dir.name,
             "has_snapshot": snapshot.exists(),
@@ -187,7 +185,12 @@ def _get_events() -> list[dict]:
 def gallery():
     events = _get_events()
     pin_enabled = bool(_get_pin())
-    return render_template("gallery.html", events=events, pin_enabled=pin_enabled)
+    return render_template(
+        "gallery.html",
+        events=events,
+        pin_enabled=pin_enabled,
+        default_sources=_DEFAULT_GALLERY_SOURCES,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -227,8 +230,6 @@ def viewer(event_id):
     if not event_dir.exists():
         return "Event not found", 404
     event = _get_event_meta(event_id)
-    if event.get("source") not in _GALLERY_SOURCES:
-        return "Event not found", 404
     return render_template("viewer.html", event_id=event_id, event=event)
 
 

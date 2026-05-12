@@ -40,6 +40,11 @@ log = logging.getLogger("pipeline")
 _lock = threading.Lock()
 _is_processing = False
 
+# event_id -> source. Lets _cleanup_old_events skip metadata.json reads on
+# warm runs; rebuilt lazily after a process restart. Bounded by total events
+# on disk (max_events × number of sources).
+_source_by_id: dict[str, str] = {}
+
 
 def is_processing() -> bool:
     return _is_processing
@@ -140,6 +145,7 @@ def process_event(
         (event_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
 
         # Step 5: Housekeeping — remove oldest events
+        _source_by_id[event_id] = source
         _cleanup_old_events(events_dir, max_events)
 
         return metadata
@@ -161,12 +167,30 @@ def process_event(
 
 
 def _cleanup_old_events(events_dir: Path, max_events: int):
-    """Remove oldest events beyond the configured maximum."""
-    all_events = sorted(
-        [d for d in events_dir.iterdir() if d.is_dir()],
-        key=lambda p: p.name,
-        reverse=True,
-    )
-    for old_dir in all_events[max_events:]:
-        shutil.rmtree(old_dir, ignore_errors=True)
-        log.info(f"Cleaned up old event: {old_dir.name}")
+    """Remove oldest events beyond max_events, applied independently per source.
+
+    Each trigger source (ifttt, pi_monitor, …) gets its own quota so a noisy
+    fallback can't evict events from the curated IFTTT feed and vice versa.
+    """
+    event_dirs = [d for d in events_dir.iterdir() if d.is_dir()]
+    by_source: dict[str, list[Path]] = {}
+    for d in sorted(event_dirs, key=lambda p: p.name, reverse=True):
+        source = _source_by_id.get(d.name)
+        if source is None:
+            source = "unknown"
+            meta_file = d / "metadata.json"
+            if meta_file.exists():
+                try:
+                    parsed = json.loads(meta_file.read_text())
+                    if isinstance(parsed, dict):
+                        source = parsed.get("source", "unknown")
+                except (json.JSONDecodeError, OSError):
+                    pass
+            _source_by_id[d.name] = source
+        by_source.setdefault(source, []).append(d)
+
+    for source, dirs in by_source.items():
+        for old_dir in dirs[max_events:]:
+            shutil.rmtree(old_dir, ignore_errors=True)
+            _source_by_id.pop(old_dir.name, None)
+            log.info(f"Cleaned up old event ({source}): {old_dir.name}")

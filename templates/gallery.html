@@ -377,19 +377,34 @@ img { display: block; }
 
 <script>
 window.GALLERY_EVENTS = {{ events | tojson }};
+window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
 </script>
 <script>
 (function () {
   'use strict';
 
+  var DEFAULT_SOURCES = (window.GALLERY_DEFAULT_SOURCES || ['ifttt']).slice();
+  var SOURCE_LABELS = { 'ifttt': 'IFTTT', 'pi_monitor': 'Pi monitor' };
+
   var S = {
-    all:    window.GALLERY_EVENTS || [],
-    types:  [],
-    range:  'all',
-    layout: 'rows',
-    now:    new Date(),
-    sync:   '–',
+    all:     window.GALLERY_EVENTS || [],
+    types:   [],
+    sources: DEFAULT_SOURCES.slice(),
+    range:   'all',
+    layout:  'rows',
+    now:     new Date(),
+    sync:    '–',
   };
+
+  function sourceLabel(s) { return SOURCE_LABELS[s] || s || 'unknown'; }
+
+  function knownSources() {
+    var seen = {};
+    S.all.forEach(function (ev) { seen[ev.source || 'unknown'] = true; });
+    // Make sure the default sources always render even if no events exist yet.
+    DEFAULT_SOURCES.forEach(function (s) { seen[s] = true; });
+    return Object.keys(seen).sort();
+  }
 
   /* ── Time helpers ──────────────────────────────────────────────────────── */
 
@@ -473,7 +488,7 @@ window.GALLERY_EVENTS = {{ events | tojson }};
     var t = parseTime(ev);
     var chips = '';
     if (ev.event_type) chips += '<span class="chip" data-type="' + esc(ev.event_type) + '">' + esc(ev.event_type) + '</span>';
-    chips += '<span class="chip">via ' + esc(ev.source || 'unknown') + '</span>';
+    chips += '<span class="chip">via ' + esc(sourceLabel(ev.source)) + '</span>';
     if (ev.elapsed_s)  chips += '<span class="chip">+' + ev.elapsed_s + 's lag</span>';
     if (ev.has_ply)    chips += '<span class="chip mono">PLY·' + fmtSize(ev.ply_size) + '</span>';
 
@@ -563,6 +578,7 @@ window.GALLERY_EVENTS = {{ events | tojson }};
     var CUTOFFS = { '1d': 86400000, '7d': 7 * 86400000, '30d': 30 * 86400000 };
     var cutoff  = CUTOFFS[S.range] ? new Date(Date.now() - CUTOFFS[S.range]) : null;
     return S.all.filter(function (ev) {
+      if (S.sources.length && S.sources.indexOf(ev.source || 'unknown') === -1) return false;
       if (S.types.length && S.types.indexOf(ev.event_type) === -1) return false;
       if (cutoff && parseTime(ev) < cutoff) return false;
       return true;
@@ -607,6 +623,7 @@ window.GALLERY_EVENTS = {{ events | tojson }};
   function renderFilters(filtered) {
     var TYPES  = ['person', 'animal', 'package', 'vehicle', 'lingering'];
     var RANGES = [['1d','Last 24h'], ['7d','7 days'], ['30d','30 days'], ['all','All time']];
+    var SOURCES = knownSources();
 
     var typeChips = TYPES.map(function (t) {
       var on = S.types.indexOf(t) !== -1;
@@ -618,7 +635,16 @@ window.GALLERY_EVENTS = {{ events | tojson }};
       return '<button class="chip chip--btn' + (on ? ' chip--on' : '') + '" data-filter-range="' + r[0] + '">' + r[1] + '</button>';
     }).join('');
 
+    var sourceChips = SOURCES.map(function (s) {
+      var on = S.sources.indexOf(s) !== -1;
+      return '<button class="chip chip--btn' + (on ? ' chip--on' : '') + '" data-filter-source="' + esc(s) + '">' + esc(sourceLabel(s)) + '</button>';
+    }).join('');
+
     document.getElementById('js-filters').innerHTML = (
+      '<div class="filters__row">' +
+        '<span class="label-xs" style="min-width:44px">Source</span>' +
+        '<div class="chips">' + sourceChips + '</div>' +
+      '</div>' +
       '<div class="filters__row">' +
         '<span class="label-xs" style="min-width:44px">Type</span>' +
         '<div class="chips">' + typeChips + '</div>' +
@@ -677,6 +703,12 @@ window.GALLERY_EVENTS = {{ events | tojson }};
       if (idx === -1) S.types.push(t); else S.types.splice(idx, 1);
       var f = getFiltered(); renderFilters(f); renderEvents(f); return;
     }
+    var fs = e.target.closest('[data-filter-source]');
+    if (fs) {
+      var src = fs.dataset.filterSource, sIdx = S.sources.indexOf(src);
+      if (sIdx === -1) S.sources.push(src); else S.sources.splice(sIdx, 1);
+      var f = getFiltered(); renderFilters(f); renderEvents(f); return;
+    }
     var fr = e.target.closest('[data-filter-range]');
     if (fr) {
       S.range = fr.dataset.filterRange;
@@ -689,6 +721,7 @@ window.GALLERY_EVENTS = {{ events | tojson }};
     }
     if (e.target.closest('[data-clear]')) {
       S.types = []; S.range = 'all';
+      S.sources = DEFAULT_SOURCES.slice();
       var f = getFiltered(); renderFilters(f); renderEvents(f);
     }
   });
