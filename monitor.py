@@ -124,23 +124,34 @@ def capture_raw_frame(rtsp_url, transport, width, height):
 
 
 def compute_frame_diff(frame_a, frame_b, threshold):
-    """Compare two raw RGB frames. Returns (mean_diff, pct_changed)."""
+    """Compare two raw RGB frames. Returns (mean_diff, pct_changed).
+
+    Brightness-normalised: subtracts the per-frame mean luminance before
+    comparing so global auto-exposure shifts don't register as motion.
+    mean_diff is the raw (un-normalised) mean absolute diff for metadata.
+    """
     if len(frame_a) != len(frame_b):
         return 0.0, 0.0
 
-    total_pixels = len(frame_a) // 3
-    total_diff = 0
-    changed = 0
+    n_pixels = len(frame_a) // 3
+    signed_diffs = []
+    total_signed = 0
+    total_abs = 0
 
     for i in range(0, len(frame_a), 3):
-        avg_a = (frame_a[i] + frame_a[i + 1] + frame_a[i + 2]) // 3
-        avg_b = (frame_b[i] + frame_b[i + 1] + frame_b[i + 2]) // 3
-        diff = abs(avg_a - avg_b)
-        total_diff += diff
-        if diff > threshold:
-            changed += 1
+        la = (frame_a[i] + frame_a[i + 1] + frame_a[i + 2]) // 3
+        lb = (frame_b[i] + frame_b[i + 1] + frame_b[i + 2]) // 3
+        sd = la - lb
+        signed_diffs.append(sd)
+        total_signed += sd
+        total_abs += abs(sd)
 
-    return total_diff / total_pixels, (changed / total_pixels) * 100
+    # mean_signed captures global brightness shift (auto-exposure, sunrise, etc.)
+    mean_signed = total_signed / n_pixels
+
+    changed = sum(1 for sd in signed_diffs if abs(sd - mean_signed) > threshold)
+
+    return total_abs / n_pixels, (changed / n_pixels) * 100
 
 
 # ---------------------------------------------------------------------------
@@ -236,9 +247,17 @@ def main():
             )
             pct_window = []
 
-        if pct >= det["min_changed_pct"]:
+        if in_cooldown:
+            # Adapt the reference during cooldown so it reflects the current
+            # scene by the time we're ready to detect again. Without this, a
+            # stale reference (e.g. captured at a different time of day) causes
+            # every poll to appear as motion and the monitor fires on every
+            # cooldown expiry instead of on actual events.
+            reference = current
+            confirm_count = 0
+        elif pct >= det["min_changed_pct"]:
             confirm_count += 1
-            if confirm_count >= det["confirm_frames"] and not in_cooldown:
+            if confirm_count >= det["confirm_frames"]:
                 dt_since_last = now - last_trigger if last_trigger else -1
                 log.info(
                     f"MOTION CONFIRMED: pct={pct:.1f}% "
@@ -284,8 +303,6 @@ def main():
                 confirm_count = 0
         else:
             confirm_count = 0
-
-        if pct < det["min_changed_pct"]:
             reference = current
 
     log.info("Monitor stopped.")

@@ -92,12 +92,14 @@ img { display: block; }
 .chip[data-type="package"]   { color: oklch(0.78 0.13 305); border-color: oklch(0.4 0.08 305); }
 .chip[data-type="vehicle"]   { color: oklch(0.82 0.13 230); border-color: oklch(0.4 0.08 230); }
 .chip[data-type="lingering"] { color: oklch(0.78 0.14 25);  border-color: oklch(0.4 0.08 25); }
+.chip[data-type="motion"]    { color: oklch(0.78 0.08 260); border-color: oklch(0.4 0.06 260); }
 
 [data-mode="light"] .chip[data-type="person"]    { color: oklch(0.4  0.13 145); border-color: oklch(0.78 0.08 145); background: oklch(0.96 0.04 145); }
 [data-mode="light"] .chip[data-type="animal"]    { color: oklch(0.42 0.14 65);  border-color: oklch(0.8  0.08 65);  background: oklch(0.96 0.04 65); }
 [data-mode="light"] .chip[data-type="package"]   { color: oklch(0.42 0.13 305); border-color: oklch(0.8  0.08 305); background: oklch(0.96 0.04 305); }
 [data-mode="light"] .chip[data-type="vehicle"]   { color: oklch(0.42 0.13 230); border-color: oklch(0.8  0.08 230); background: oklch(0.96 0.04 230); }
 [data-mode="light"] .chip[data-type="lingering"] { color: oklch(0.42 0.14 25);  border-color: oklch(0.8  0.08 25);  background: oklch(0.96 0.04 25); }
+[data-mode="light"] .chip[data-type="motion"]    { color: oklch(0.35 0.08 260); border-color: oklch(0.75 0.06 260); background: oklch(0.96 0.03 260); }
 
 .btn {
   display: inline-flex; align-items: center; gap: 8px;
@@ -621,7 +623,7 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
   var GRID_ICON = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden><rect x="1" y="1" width="6" height="6" rx="0.5"/><rect x="9" y="1" width="6" height="6" rx="0.5"/><rect x="1" y="9" width="6" height="6" rx="0.5"/><rect x="9" y="9" width="6" height="6" rx="0.5"/></svg>';
 
   function renderFilters(filtered) {
-    var TYPES  = ['person', 'animal', 'package', 'vehicle', 'lingering'];
+    var TYPES  = ['person', 'animal', 'package', 'vehicle', 'lingering', 'motion'];
     var RANGES = [['1d','Last 24h'], ['7d','7 days'], ['30d','30 days'], ['all','All time']];
     var SOURCES = knownSources();
 

@@ -57,6 +57,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .chip[data-type="package"]   { color: oklch(0.78 0.13 305); border-color: oklch(0.4 0.08 305); }
 .chip[data-type="vehicle"]   { color: oklch(0.82 0.13 230); border-color: oklch(0.4 0.08 230); }
 .chip[data-type="lingering"] { color: oklch(0.78 0.14 25);  border-color: oklch(0.4 0.08 25); }
+.chip[data-type="motion"]    { color: oklch(0.78 0.08 260); border-color: oklch(0.4 0.06 260); }
 .btn {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 8px 14px; border-radius: var(--radius);
@@ -393,9 +394,10 @@ async function mountParallax() {
   const fs = `precision mediump float;uniform sampler2D u_rgb;uniform sampler2D u_depth;
     uniform vec2 u_offset;uniform float u_strength;varying vec2 v_uv;
     void main(){float d=texture2D(u_depth,v_uv).r;
-      vec2 disp=u_offset*d*u_strength;
-      vec2 uv=clamp(v_uv-disp,0.,1.);
-      gl_FragColor=texture2D(u_rgb,uv);}`;
+      float d2=d*d;
+      vec2 disp=u_offset*d2*u_strength;
+      disp=clamp(disp,v_uv-1.,v_uv);
+      gl_FragColor=texture2D(u_rgb,v_uv-disp);}`;
 
   function compile(src, type) { const s=gl.createShader(type); gl.shaderSource(s,src); gl.compileShader(s); return s; }
   const prog = gl.createProgram();
