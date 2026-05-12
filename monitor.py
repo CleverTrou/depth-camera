@@ -201,12 +201,13 @@ def main():
 
     last_trigger = 0.0
     confirm_count = 0
-    confirm_streak_max = 0  # peak confirm_count since last trigger
     pct_window: list[float] = []  # samples for the per-minute summary
     samples_per_minute = max(1, int(60 / det["poll_interval"]))
 
     while running:
         time.sleep(det["poll_interval"])
+
+        now = time.time()
 
         current = capture_raw_frame(
             cam["rtsp_url"], cam["rtsp_transport"],
@@ -217,7 +218,7 @@ def main():
             continue
 
         mean_diff, pct = compute_frame_diff(reference, current, det["threshold"])
-        in_cooldown = (time.time() - last_trigger) < det["cooldown"]
+        in_cooldown = (now - last_trigger) < det["cooldown"]
 
         # Rolling minute summary so we can see the noise floor without
         # spamming a log line for every poll.
@@ -237,13 +238,12 @@ def main():
 
         if pct >= det["min_changed_pct"]:
             confirm_count += 1
-            confirm_streak_max = max(confirm_streak_max, confirm_count)
             if confirm_count >= det["confirm_frames"] and not in_cooldown:
-                dt_since_last = time.time() - last_trigger if last_trigger else -1
+                dt_since_last = now - last_trigger if last_trigger else -1
                 log.info(
                     f"MOTION CONFIRMED: pct={pct:.1f}% "
                     f"mean_diff={mean_diff:.1f} "
-                    f"streak={confirm_streak_max} polls "
+                    f"streak={confirm_count} polls "
                     f"dt_since_last={dt_since_last:.0f}s — running depth pipeline"
                 )
 
@@ -271,7 +271,7 @@ def main():
                         extra_metadata={
                             "trigger_pct": round(pct, 2),
                             "trigger_mean_diff": round(mean_diff, 2),
-                            "trigger_confirm_streak": confirm_streak_max,
+                            "trigger_confirm_streak": confirm_count,
                             "trigger_dt_since_last_s": round(dt_since_last, 1),
                             "detection_threshold": det["threshold"],
                             "detection_min_changed_pct": det["min_changed_pct"],
@@ -280,9 +280,8 @@ def main():
                     if result:
                         log.info(f"Event {result['event_id']} processed in {result['elapsed_s']}s")
 
-                last_trigger = time.time()
+                last_trigger = now
                 confirm_count = 0
-                confirm_streak_max = 0
         else:
             confirm_count = 0
 
