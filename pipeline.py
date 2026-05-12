@@ -67,6 +67,7 @@ def process_event(
     depth_input_size: int = 518,
     colormap: str = "inferno",
     ntfy_topic_url: str | None = None,
+    extra_metadata: dict | None = None,
 ) -> dict | None:
     """
     Run the full processing pipeline on a captured JPEG frame.
@@ -80,6 +81,9 @@ def process_event(
         ply_downsample: Point cloud downsampling factor (2 = quarter pixels).
         depth_input_size: Model input resolution (518 default, 384 for speed).
         colormap: Matplotlib colormap for depth visualization.
+        extra_metadata: Optional dict merged into metadata.json. Lets callers
+            persist trigger diagnostics (motion pct, mean_diff, etc.) without
+            growing the function signature for every new field.
 
     Returns:
         Dict with event_id and output paths, or None if processing failed.
@@ -142,6 +146,8 @@ def process_event(
             "ply_downsample": ply_downsample,
             "image_size": list(pil_image.size),
         }
+        if extra_metadata:
+            metadata.update(extra_metadata)
         (event_dir / "metadata.json").write_text(json.dumps(metadata, indent=2))
 
         # Step 5: Housekeeping — remove oldest events

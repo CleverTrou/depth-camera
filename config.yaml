@@ -36,7 +36,7 @@ detection:
   compare_height: 240
   threshold: 20
   min_changed_pct: 5.0
-  cooldown: 30
+  cooldown: 120              # ~30 triggers/hour ceiling; bump higher in noisy scenes
   confirm_frames: 2
   lookback_s: 2              # Shorter than IFTTT (local is faster)
   snapshot_quality: 2

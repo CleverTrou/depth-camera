@@ -46,7 +46,10 @@ DEFAULT_CONFIG = {
         "compare_height": 240,
         "threshold": 20,
         "min_changed_pct": 5.0,
-        "cooldown": 30,
+        # 30s was producing ~90 triggers/hour on a windy day (sustained motion
+        # saturates the cooldown). 120s caps it at ~30/hour while we tune the
+        # threshold + min_changed_pct from real telemetry.
+        "cooldown": 120,
         "confirm_frames": 2,
         "lookback_s": 2,
         "snapshot_quality": 2,
@@ -196,11 +199,15 @@ def main():
 
     log.info("Reference captured. Monitoring...")
 
-    last_trigger = 0
+    last_trigger = 0.0
     confirm_count = 0
+    pct_window: list[float] = []  # samples for the per-minute summary
+    samples_per_minute = max(1, int(60 / det["poll_interval"]))
 
     while running:
         time.sleep(det["poll_interval"])
+
+        now = time.time()
 
         current = capture_raw_frame(
             cam["rtsp_url"], cam["rtsp_transport"],
@@ -210,13 +217,35 @@ def main():
             confirm_count = 0
             continue
 
-        _, pct = compute_frame_diff(reference, current, det["threshold"])
-        in_cooldown = (time.time() - last_trigger) < det["cooldown"]
+        mean_diff, pct = compute_frame_diff(reference, current, det["threshold"])
+        in_cooldown = (now - last_trigger) < det["cooldown"]
+
+        # Rolling minute summary so we can see the noise floor without
+        # spamming a log line for every poll.
+        pct_window.append(pct)
+        if len(pct_window) >= samples_per_minute:
+            ordered = sorted(pct_window)
+            n = len(ordered)
+            p50 = ordered[n // 2]
+            p90 = ordered[min(n - 1, int(n * 0.9))]
+            over = sum(1 for p in pct_window if p >= det["min_changed_pct"])
+            log.info(
+                f"baseline ({n} polls): "
+                f"max={ordered[-1]:.1f}% p90={p90:.1f}% p50={p50:.1f}% "
+                f"over-threshold={over}/{n}"
+            )
+            pct_window = []
 
         if pct >= det["min_changed_pct"]:
             confirm_count += 1
             if confirm_count >= det["confirm_frames"] and not in_cooldown:
-                log.info("MOTION CONFIRMED — running depth pipeline")
+                dt_since_last = now - last_trigger if last_trigger else -1
+                log.info(
+                    f"MOTION CONFIRMED: pct={pct:.1f}% "
+                    f"mean_diff={mean_diff:.1f} "
+                    f"streak={confirm_count} polls "
+                    f"dt_since_last={dt_since_last:.0f}s — running depth pipeline"
+                )
 
                 image_data = extract_frame(
                     ring["dir"], det["lookback_s"],
@@ -239,11 +268,19 @@ def main():
                         depth_input_size=pipe["depth_input_size"],
                         colormap=pipe["colormap"],
                         ntfy_topic_url=ntfy_url,
+                        extra_metadata={
+                            "trigger_pct": round(pct, 2),
+                            "trigger_mean_diff": round(mean_diff, 2),
+                            "trigger_confirm_streak": confirm_count,
+                            "trigger_dt_since_last_s": round(dt_since_last, 1),
+                            "detection_threshold": det["threshold"],
+                            "detection_min_changed_pct": det["min_changed_pct"],
+                        },
                     )
                     if result:
                         log.info(f"Event {result['event_id']} processed in {result['elapsed_s']}s")
 
-                last_trigger = time.time()
+                last_trigger = now
                 confirm_count = 0
         else:
             confirm_count = 0
