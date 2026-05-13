@@ -276,6 +276,15 @@ img { display: block; }
 
 .ftr { display: flex; align-items: center; gap: 12px; padding-top: 32px; margin-top: 48px; border-top: 1px solid var(--line-soft); font-size: 11px; color: var(--fg-faint); letter-spacing: 0.04em; }
 
+@media (max-width: 640px) {
+  .app { padding: 16px 16px 64px; }
+  .hdr { grid-template-columns: 1fr; gap: 12px; padding: 12px 0 16px; }
+  .hdr > div:last-child { overflow-x: auto; padding-bottom: 2px; }
+  .hdr__readout { width: max-content; }
+  .stat { min-width: 72px; padding: 8px 12px; }
+  .stat__v { font-size: 14px; }
+}
+
 [data-aesthetic="brutalist"] .film, [data-aesthetic="brutalist"] .filters,
 [data-aesthetic="brutalist"] .stat, [data-aesthetic="brutalist"] .hdr__readout,
 [data-aesthetic="brutalist"] .empty { border-width: 2px; }
@@ -393,7 +402,7 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
     types:   [],
     sources: DEFAULT_SOURCES.slice(),
     range:   'all',
-    layout:  'rows',
+    layout:  (window.innerWidth || 1024) <= 640 ? 'grid' : 'rows',
     now:     new Date(),
     sync:    '–',
   };
@@ -642,11 +651,14 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
       return '<button class="chip chip--btn' + (on ? ' chip--on' : '') + '" data-filter-source="' + esc(s) + '">' + esc(sourceLabel(s)) + '</button>';
     }).join('');
 
+    var sourceRow = SOURCES.length > 1
+      ? '<div class="filters__row">' +
+          '<span class="label-xs" style="min-width:44px">Source</span>' +
+          '<div class="chips">' + sourceChips + '</div>' +
+        '</div>'
+      : '';
     document.getElementById('js-filters').innerHTML = (
-      '<div class="filters__row">' +
-        '<span class="label-xs" style="min-width:44px">Source</span>' +
-        '<div class="chips">' + sourceChips + '</div>' +
-      '</div>' +
+      sourceRow +
       '<div class="filters__row">' +
         '<span class="label-xs" style="min-width:44px">Type</span>' +
         '<div class="chips">' + typeChips + '</div>' +
