@@ -524,8 +524,8 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
           '<div class="row__id mono">' + esc(ev.event_id) + '</div>' +
         '</div>' +
         '<div class="row__cta">' +
-          '<span class="row__seq mono">#' + String(seq).padStart(2,'0') +
-            '<span class="row__seq-tot">/' + String(total).padStart(2,'0') + '</span></span>' +
+          '<span class="row__seq mono">#' + String(seq).padStart(3,'0') +
+            '<span class="row__seq-tot">/' + String(total).padStart(3,'0') + '</span></span>' +
           '<span class="btn btn--primary">View 2.5D →</span>' +
         '</div>' +
       '</a></li>'
@@ -540,7 +540,7 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
       : '';
     return (
       '<a href="' + viewUrl(ev) + '" class="film">' +
-        '<div class="film__seq mono">#' + String(seq).padStart(2,'0') + '</div>' +
+        '<div class="film__seq mono">#' + String(seq).padStart(3,'0') + '</div>' +
         '<div class="film__media">' + thumbHTML(ev, 'rgb') +
           '<div class="film__pip">' + thumbHTML(ev, 'depth') +
             '<span class="film__pip-tag mono">D</span>' +
@@ -566,10 +566,10 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
     var items;
     if (S.layout === 'grid') {
       items = '<div class="grid-uniform">' +
-        dayEvents.map(function (ev, i) { return filmCardHTML(ev, i + 1); }).join('') + '</div>';
+        dayEvents.map(function (ev, i) { return filmCardHTML(ev, n - i); }).join('') + '</div>';
     } else {
       items = '<ol class="rows">' +
-        dayEvents.map(function (ev, i) { return rowCardHTML(ev, i + 1, n, i === 0); }).join('') + '</ol>';
+        dayEvents.map(function (ev, i) { return rowCardHTML(ev, n - i, n, i === 0); }).join('') + '</ol>';
     }
     return (
       '<section class="day">' +
