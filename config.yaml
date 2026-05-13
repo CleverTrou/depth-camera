@@ -35,9 +35,10 @@ detection:
   compare_width: 320
   compare_height: 240
   threshold: 20
-  min_changed_pct: 5.0
-  cooldown: 120              # ~30 triggers/hour ceiling; bump higher in noisy scenes
-  confirm_frames: 2
+  min_changed_pct: 20.0      # was 5.0; baselines show p50 30-76%, 5% caught everything
+  min_mean_diff: 12.0        # absolute pixel-intensity gate; filters lighting flicker
+  cooldown: 300              # was 120; hard ceiling ~12 triggers/hour
+  confirm_frames: 3          # was 2; require 9s sustained motion instead of 6s
   lookback_s: 2              # Shorter than IFTTT (local is faster)
   snapshot_quality: 2
 

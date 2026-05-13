@@ -248,7 +248,7 @@ def main():
             # cooldown expiry instead of on actual events.
             reference = current
             confirm_count = 0
-        elif pct >= det["min_changed_pct"]:
+        elif pct >= det["min_changed_pct"] and mean_diff >= det.get("min_mean_diff", 0):
             confirm_count += 1
             if confirm_count >= det["confirm_frames"]:
                 dt_since_last = now - last_trigger if last_trigger else -1
