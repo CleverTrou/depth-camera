@@ -439,7 +439,7 @@ async function mountParallax() {
   let loaded = 0;
   let raf;
   function tryStart() {
-    if (loaded >= 2) {
+    if (loaded >= 2 && canvas.parentElement) {
       loadOverlay.remove();
       updateQuad();
       render();
@@ -878,7 +878,8 @@ switchMode(mode);
 // iOS Safari restores pages from BFCache on back/forward nav — scripts don't
 // re-run, leaving the dock unhighlighted and stage empty. Re-mount on restore.
 window.addEventListener('pageshow', function(e) {
-  if (e.persisted && !cleanup) {
+  if (e.persisted) {
+    if (cleanup) { try { cleanup(); } catch(_) {} cleanup = null; }
     updateDock();
     switchMode(mode);
   }
