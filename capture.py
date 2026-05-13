@@ -133,6 +133,12 @@ def extract_frame(
             cmd += ["-ss", f"{seek_pos:.1f}"]
         cmd += [
             "-vframes", "1",
+            # Ensure even dimensions (MJPEG MCU constraint) and an explicit
+            # full-range YUV420 pixel format. Both are no-ops for normal
+            # 2688×1520 frames but prevent EINVAL if the camera briefly
+            # sends odd-sized or unusually-formatted frames on wake-up.
+            "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+            "-pix_fmt", "yuvj420p",
             "-q:v", str(quality),
             "-f", "image2pipe",
             "-c:v", "mjpeg",
@@ -187,6 +193,8 @@ def capture_direct(
         "-skip_frame", "nonkey",
         "-i", rtsp_url,
         "-vframes", "1",
+        "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+        "-pix_fmt", "yuvj420p",
         "-q:v", str(quality),
         "-f", "image2pipe",
         "-c:v", "mjpeg",
