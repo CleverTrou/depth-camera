@@ -205,8 +205,9 @@ def main():
 
     last_trigger = 0.0
     confirm_count = 0
-    pct_window: list[float] = []  # samples for the per-minute summary
+    pct_window: list[tuple[float, float]] = []  # (pct, mean_diff) per poll
     samples_per_minute = max(1, int(60 / det["poll_interval"]))
+    min_mean_diff = det.get("min_mean_diff", 0)
 
     while running:
         time.sleep(det["poll_interval"])
@@ -226,16 +227,19 @@ def main():
 
         # Rolling minute summary so we can see the noise floor without
         # spamming a log line for every poll.
-        pct_window.append(pct)
+        pct_window.append((pct, mean_diff))
         if len(pct_window) >= samples_per_minute:
-            ordered = sorted(pct_window)
-            n = len(ordered)
-            p50 = ordered[n // 2]
-            p90 = ordered[min(n - 1, int(n * 0.9))]
-            over = sum(1 for p in pct_window if p >= det["min_changed_pct"])
+            pcts = sorted(p for p, _ in pct_window)
+            n = len(pcts)
+            p50 = pcts[n // 2]
+            p90 = pcts[min(n - 1, int(n * 0.9))]
+            over = sum(
+                1 for p, m in pct_window
+                if p >= det["min_changed_pct"] and m >= min_mean_diff
+            )
             log.info(
                 f"baseline ({n} polls): "
-                f"max={ordered[-1]:.1f}% p90={p90:.1f}% p50={p50:.1f}% "
+                f"max={pcts[-1]:.1f}% p90={p90:.1f}% p50={p50:.1f}% "
                 f"over-threshold={over}/{n}"
             )
             pct_window = []
@@ -248,7 +252,7 @@ def main():
             # cooldown expiry instead of on actual events.
             reference = current
             confirm_count = 0
-        elif pct >= det["min_changed_pct"] and mean_diff >= det.get("min_mean_diff", 0):
+        elif pct >= det["min_changed_pct"] and mean_diff >= min_mean_diff:
             confirm_count += 1
             if confirm_count >= det["confirm_frames"]:
                 dt_since_last = now - last_trigger if last_trigger else -1
