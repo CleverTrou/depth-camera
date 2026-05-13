@@ -117,18 +117,29 @@ def _capture_and_process(source, event_type, lookback_override=None):
 
     lookback = lookback_override if lookback_override is not None else relay["lookback_s"]
 
-    # Try ring buffer first, fall back to live RTSP
-    image_data = extract_frame(
-        ring["dir"], lookback,
-        ring["segment_seconds"], relay["snapshot_quality"],
-    )
-    if image_data is None:
+    # Try ring buffer first, fall back to live RTSP.
+    # Retry once after a short delay: the camera can briefly send
+    # undecodable frames on wake-up, and the ring buffer may be mid-restart
+    # when an event arrives. A 3s pause usually lets both stabilise.
+    image_data = None
+    for attempt in range(2):
+        if attempt > 0:
+            log.warning("Capture attempt 1 failed — retrying in 3s...")
+            time.sleep(3)
+        image_data = extract_frame(
+            ring["dir"], lookback,
+            ring["segment_seconds"], relay["snapshot_quality"],
+        )
+        if image_data is not None:
+            break
         log.warning("Ring buffer unavailable — falling back to direct RTSP")
         image_data = capture_direct(
             _config["camera"]["rtsp_url"],
             _config["camera"]["rtsp_transport"],
             relay["snapshot_quality"],
         )
+        if image_data is not None:
+            break
 
     if image_data is None:
         log.error(
