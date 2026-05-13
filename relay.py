@@ -121,13 +121,17 @@ def _capture_and_process(source, event_type, lookback_override=None):
     # Retry once after a short delay: the camera can briefly send
     # undecodable frames on wake-up, and the ring buffer may be mid-restart
     # when an event arrives. A 3s pause usually lets both stabilise.
+    # Adjust lookback on each attempt so the absolute target timestamp stays
+    # anchored to the original event time despite the sleep between attempts.
     image_data = None
+    start_time = time.time()
     for attempt in range(2):
         if attempt > 0:
-            log.warning("Capture attempt 1 failed — retrying in 3s...")
+            log.warning(f"Capture attempt {attempt} failed — retrying in 3s...")
             time.sleep(3)
+        current_lookback = lookback + (time.time() - start_time)
         image_data = extract_frame(
-            ring["dir"], lookback,
+            ring["dir"], current_lookback,
             ring["segment_seconds"], relay["snapshot_quality"],
         )
         if image_data is not None:
