@@ -789,6 +789,9 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
 
   setInterval(doRefresh,   30000);
   setInterval(tickRelTimes, 30000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) doRefresh();
+  });
 
   /* ── Init ──────────────────────────────────────────────────────────────── */
   S.sync = new Date().toLocaleTimeString(undefined,

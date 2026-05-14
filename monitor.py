@@ -43,8 +43,8 @@ DEFAULT_CONFIG = {
     },
     "detection": {
         "poll_interval": 3,
-        "compare_width": 320,
-        "compare_height": 240,
+        "compare_width": 80,
+        "compare_height": 60,
         "threshold": 20,
         "min_changed_pct": 5.0,
         # 30s was producing ~90 triggers/hour on a windy day (sustained motion
@@ -157,7 +157,7 @@ def save_motion_diff(
         img = Image.fromarray(vis.clip(0, 255).astype(np.uint8))
         img = img.resize((width * 3, height * 3), Image.NEAREST)
         img.save(event_dir / "motion_diff.jpg", quality=85)
-    except Exception as e:
+    except (ImportError, ValueError, OSError) as e:
         log.warning(f"Failed to save motion diff: {e}")
 
 

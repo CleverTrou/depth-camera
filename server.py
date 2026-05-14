@@ -210,24 +210,18 @@ def _get_event_meta(event_id: str) -> dict:
         except (json.JSONDecodeError, OSError):
             pass
     ply = event_dir / "pointcloud.ply"
-    result = {
+    # defaults → meta (preserves all extra keys like trigger_pct) → calculated
+    # (calculated values always win so filesystem checks can't be overridden)
+    return {
+        "event_type": "", "source": "", "timestamp": "", "elapsed_s": 0,
+        **(meta if isinstance(meta, dict) else {}),
         "event_id": event_id,
         "has_snapshot": (event_dir / "snapshot.jpg").exists(),
         "has_colormap": (event_dir / "depth_colormap.jpg").exists(),
         "has_ply": ply.exists(),
         "ply_size": ply.stat().st_size if ply.exists() else 0,
         "has_motion_diff": (event_dir / "motion_diff.jpg").exists(),
-        "event_type": meta.get("event_type", ""),
-        "source": meta.get("source", ""),
-        "timestamp": meta.get("timestamp", ""),
-        "elapsed_s": meta.get("elapsed_s", 0),
     }
-    # Merge all metadata.json keys (e.g. trigger_pct, trigger_mean_diff) so
-    # the viewer has the full picture without enumerating fields here.
-    for k, v in meta.items():
-        if k not in result:
-            result[k] = v
-    return result
 
 
 @app.route("/events/<event_id>/viewer")
