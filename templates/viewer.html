@@ -291,6 +291,12 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
         <span class="dock__pill-label">XR</span>
         <span class="dock__pill-hint">vr · ar</span>
       </button>
+      {% if event.has_motion_diff %}
+      <button class="dock__pill" data-mode="diff">
+        <span class="dock__pill-label">Diff</span>
+        <span class="dock__pill-hint">motion mask</span>
+      </button>
+      {% endif %}
     </div>
     <div class="dock__actions">
       <a href="/" class="btn btn--ghost">&#x2039; Gallery</a>
@@ -312,7 +318,7 @@ const stage = document.getElementById('js-stage');
 const dock  = document.getElementById('js-dock');
 
 // ── State ─────────────────────────────────────────────────────────────────
-const _VALID_MODES = new Set(['parallax', 'depth', 'cloud', 'xr']);
+const _VALID_MODES = new Set(['parallax', 'depth', 'cloud', 'xr', 'diff']);
 const _savedMode = localStorage.getItem('viewer-mode');
 let mode    = (_savedMode && _VALID_MODES.has(_savedMode)) ? _savedMode : 'parallax';
 let cleanup = null;   // current mode cleanup fn
@@ -338,7 +344,7 @@ function switchMode(newMode) {
   mode = newMode;
   localStorage.setItem('viewer-mode', mode);
   updateDock();
-  const mounter = { parallax: mountParallax, depth: mountDepth, cloud: mountCloud, xr: mountXr }[mode];
+  const mounter = { parallax: mountParallax, depth: mountDepth, cloud: mountCloud, xr: mountXr, diff: mountDiff }[mode];
   if (mounter) mounter().then(function(fn) { cleanup = fn || null; });
 }
 
@@ -373,6 +379,39 @@ function mkCorner(pos, html) {
 }
 
 // ── Mode: Parallax (WebGL depth-displacement) ─────────────────────────────
+// ── Mode: Motion diff ─────────────────────────────────────────────────────
+async function mountDiff() {
+  // ev.event_id is server-validated ^\d{8}_\d{6}_[0-9a-f]{6}$ — safe in URL
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#000;overflow:hidden';
+  const img = document.createElement('img');
+  img.src   = '/events/' + ev.event_id + '/motion_diff.jpg';
+  img.alt   = 'motion diff';
+  img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;image-rendering:pixelated';
+  wrap.appendChild(img);
+  stage.appendChild(wrap);
+
+  const pct  = ev.trigger_pct       != null ? ev.trigger_pct.toFixed(1) + '% pixels' : null;
+  const diff = ev.trigger_mean_diff  != null ? 'Δ' + ev.trigger_mean_diff.toFixed(1) : null;
+
+  const tl = document.createElement('div');
+  tl.className = 'stage-corner stage-corner--tl';
+  const dot = document.createElement('span');
+  dot.className = 'dot-live';
+  tl.appendChild(dot);
+  const lbl = document.createElement('span');
+  lbl.textContent = ['MOTION DIFF', pct, diff].filter(Boolean).join(' · ');
+  tl.appendChild(lbl);
+  stage.appendChild(tl);
+
+  const w = ev.compare_width  || 320;
+  const h = ev.compare_height || 240;
+  const br = document.createElement('div');
+  br.className = 'stage-corner stage-corner--br';
+  br.textContent = 'orange = changed pixels · ' + w + '×' + h + ' detection grid';
+  stage.appendChild(br);
+}
+
 async function mountParallax() {
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
