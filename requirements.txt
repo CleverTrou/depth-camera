@@ -3,7 +3,7 @@
 
 flask>=3.0
 pyyaml>=6.0.3
-requests>=2.31
+requests>=2.34.1
 
 # Depth estimation
 onnxruntime>=1.17          # Has ARM64 (aarch64) wheels on PyPI
