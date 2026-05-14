@@ -214,7 +214,7 @@ def _get_event_meta(event_id: str) -> dict:
     # (calculated values always win so filesystem checks can't be overridden)
     return {
         "event_type": "", "source": "", "timestamp": "", "elapsed_s": 0,
-        **meta,
+        **(meta if isinstance(meta, dict) else {}),
         "event_id": event_id,
         "has_snapshot": (event_dir / "snapshot.jpg").exists(),
         "has_colormap": (event_dir / "depth_colormap.jpg").exists(),
