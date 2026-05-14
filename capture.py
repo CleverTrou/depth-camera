@@ -180,7 +180,7 @@ def capture_direct(
     Only used when the ring buffer is unavailable.
     """
     log.info("Attempting direct RTSP capture (fallback — live frame)...")
-    # -skip_frame nonkey tells the input decoder to discard everything that
+    # -skip_frame nokey tells the input decoder to discard everything that
     # isn't an I-frame, so the first frame ffmpeg emits is guaranteed to be
     # a self-contained keyframe. Without this, the very first decoded frame
     # off a freshly-opened RTSP stream is often a P/B-frame whose reference
@@ -190,7 +190,7 @@ def capture_direct(
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
         "-rtsp_transport", transport,
-        "-skip_frame", "nonkey",
+        "-skip_frame", "nokey",
         "-i", rtsp_url,
         "-vframes", "1",
         "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
