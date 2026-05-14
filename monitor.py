@@ -327,6 +327,8 @@ def main():
                             "trigger_dt_since_last_s": round(dt_since_last, 1),
                             "detection_threshold": det["threshold"],
                             "detection_min_changed_pct": det["min_changed_pct"],
+                            "compare_width": det["compare_width"],
+                            "compare_height": det["compare_height"],
                         },
                     )
                     if result:

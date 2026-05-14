@@ -283,6 +283,14 @@ def serve_ply(event_id):
     )
 
 
+@app.route("/events/<event_id>/motion_diff.jpg")
+@_require_pin
+def serve_motion_diff(event_id):
+    if not _valid_event_id(event_id):
+        return "Not found", 404
+    return send_from_directory(str(_events_dir() / event_id), "motion_diff.jpg")
+
+
 # ---------------------------------------------------------------------------
 # Routes — API
 # ---------------------------------------------------------------------------
