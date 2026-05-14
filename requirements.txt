@@ -6,7 +6,7 @@ pyyaml>=6.0.3
 requests>=2.31
 
 # Depth estimation
-onnxruntime>=1.17          # Has ARM64 (aarch64) wheels on PyPI
+onnxruntime>=1.26.0          # Has ARM64 (aarch64) wheels on PyPI
 numpy>=2.4.4
 Pillow>=10.0
 
