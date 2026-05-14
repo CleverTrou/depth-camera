@@ -147,6 +147,14 @@ def extract_frame(
 
         result = subprocess.run(cmd, capture_output=True, timeout=10)
         if result.returncode == 0 and len(result.stdout) > 1000:
+            stderr_text = result.stderr.decode(errors="replace")
+            if "error while decoding" in stderr_text:
+                log.warning(
+                    f"H.264 decode error in ring buffer frame — rejecting "
+                    f"(lookback={lookback_s:.0f}s): "
+                    f"{stderr_text[-200:]}"
+                )
+                return None
             log.info(
                 f"Extracted frame: {best.name} "
                 f"(lookback={lookback_s:.0f}s, seek={seek_pos:.1f}s, "

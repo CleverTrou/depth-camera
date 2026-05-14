@@ -106,6 +106,7 @@ def capture_raw_frame(rtsp_url, transport, width, height):
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
         "-rtsp_transport", transport,
+        "-skip_frame", "nokey",
         "-i", rtsp_url,
         "-vframes", "1",
         "-vf", f"scale={width}:{height}",
