@@ -151,6 +151,7 @@ def _get_events() -> list[dict]:
         colormap = event_dir / "depth_colormap.jpg"
         depth_map = event_dir / "depth_map.png"
         ply = event_dir / "pointcloud.ply"
+        motion_diff = event_dir / "motion_diff.jpg"
         meta_file = event_dir / "metadata.json"
 
         meta = {}
@@ -167,6 +168,7 @@ def _get_events() -> list[dict]:
             "has_depth_map": depth_map.exists(),
             "has_ply": ply.exists(),
             "ply_size": ply.stat().st_size if ply.exists() else 0,
+            "has_motion_diff": motion_diff.exists(),
             "event_type": meta.get("event_type", ""),
             "source": meta.get("source", ""),
             "timestamp": meta.get("timestamp", ""),
@@ -208,17 +210,24 @@ def _get_event_meta(event_id: str) -> dict:
         except (json.JSONDecodeError, OSError):
             pass
     ply = event_dir / "pointcloud.ply"
-    return {
+    result = {
         "event_id": event_id,
         "has_snapshot": (event_dir / "snapshot.jpg").exists(),
         "has_colormap": (event_dir / "depth_colormap.jpg").exists(),
         "has_ply": ply.exists(),
         "ply_size": ply.stat().st_size if ply.exists() else 0,
+        "has_motion_diff": (event_dir / "motion_diff.jpg").exists(),
         "event_type": meta.get("event_type", ""),
         "source": meta.get("source", ""),
         "timestamp": meta.get("timestamp", ""),
         "elapsed_s": meta.get("elapsed_s", 0),
     }
+    # Merge all metadata.json keys (e.g. trigger_pct, trigger_mean_diff) so
+    # the viewer has the full picture without enumerating fields here.
+    for k, v in meta.items():
+        if k not in result:
+            result[k] = v
+    return result
 
 
 @app.route("/events/<event_id>/viewer")
@@ -272,6 +281,14 @@ def serve_ply(event_id):
         as_attachment=True,
         download_name=f"{event_id}.ply",
     )
+
+
+@app.route("/events/<event_id>/motion_diff.jpg")
+@_require_pin
+def serve_motion_diff(event_id):
+    if not _valid_event_id(event_id):
+        return "Not found", 404
+    return send_from_directory(str(_events_dir() / event_id), "motion_diff.jpg")
 
 
 # ---------------------------------------------------------------------------

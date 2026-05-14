@@ -124,6 +124,42 @@ def capture_raw_frame(rtsp_url, transport, width, height):
         return None
 
 
+def save_motion_diff(
+    reference: bytes,
+    current: bytes,
+    width: int,
+    height: int,
+    threshold: int,
+    event_dir: Path,
+) -> None:
+    """Save a motion diff JPEG: dimmed current frame with motion pixels highlighted orange."""
+    try:
+        from PIL import Image
+
+        expected = width * height * 3
+        if len(reference) < expected or len(current) < expected:
+            return
+
+        ref = np.frombuffer(reference[:expected], dtype=np.uint8).reshape(height, width, 3).astype(float)
+        cur = np.frombuffer(current[:expected], dtype=np.uint8).reshape(height, width, 3).astype(float)
+
+        ref_lum = ref.mean(axis=2)
+        cur_lum = cur.mean(axis=2)
+        diffs = cur_lum - ref_lum
+        motion_mask = np.abs(diffs - float(diffs.mean())) > threshold
+
+        vis = cur * 0.45
+        vis[motion_mask, 0] = 255
+        vis[motion_mask, 1] = 140
+        vis[motion_mask, 2] = 0
+
+        img = Image.fromarray(vis.clip(0, 255).astype(np.uint8))
+        img = img.resize((width * 3, height * 3), Image.NEAREST)
+        img.save(event_dir / "motion_diff.jpg", quality=85)
+    except Exception as e:
+        log.warning(f"Failed to save motion diff: {e}")
+
+
 def compute_frame_diff(frame_a, frame_b, threshold):
     """Compare two raw RGB frames. Returns (mean_diff, pct_changed).
 
@@ -291,10 +327,18 @@ def main():
                             "trigger_dt_since_last_s": round(dt_since_last, 1),
                             "detection_threshold": det["threshold"],
                             "detection_min_changed_pct": det["min_changed_pct"],
+                            "compare_width": det["compare_width"],
+                            "compare_height": det["compare_height"],
                         },
                     )
                     if result:
                         log.info(f"Event {result['event_id']} processed in {result['elapsed_s']}s")
+                        event_dir = Path(pipe["data_dir"]) / "events" / result["event_id"]
+                        save_motion_diff(
+                            reference, current,
+                            det["compare_width"], det["compare_height"],
+                            det["threshold"], event_dir,
+                        )
 
                 last_trigger = now
                 confirm_count = 0
