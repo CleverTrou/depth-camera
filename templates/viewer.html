@@ -321,6 +321,7 @@ const dock  = document.getElementById('js-dock');
 const _VALID_MODES = new Set(['parallax', 'depth', 'cloud', 'xr', 'diff']);
 const _savedMode = localStorage.getItem('viewer-mode');
 let mode    = (_savedMode && _VALID_MODES.has(_savedMode)) ? _savedMode : 'parallax';
+if (mode === 'diff' && !ev.has_motion_diff) mode = 'parallax';
 let cleanup = null;   // current mode cleanup fn
 let xrBanner = null;  // auto-XR banner element
 
