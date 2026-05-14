@@ -407,6 +407,28 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
     sync:    '–',
   };
 
+  /* ── Sticky filter state ───────────────────────────────────────────────── */
+  var _FILTER_KEY = 'gallery-filter-state';
+
+  function saveFilterState() {
+    try {
+      localStorage.setItem(_FILTER_KEY, JSON.stringify({
+        types: S.types, sources: S.sources, range: S.range, layout: S.layout,
+      }));
+    } catch (e) {}
+  }
+
+  (function loadFilterState() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(_FILTER_KEY) || 'null');
+      if (!saved) return;
+      if (Array.isArray(saved.types))   S.types   = saved.types;
+      if (Array.isArray(saved.sources)) S.sources = saved.sources;
+      if (typeof saved.range  === 'string') S.range  = saved.range;
+      if (typeof saved.layout === 'string') S.layout = saved.layout;
+    } catch (e) {}
+  }());
+
   function sourceLabel(s) { return SOURCE_LABELS[s] || s || 'unknown'; }
 
   function knownSources() {
@@ -703,6 +725,7 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
   }
 
   function renderAll() {
+    saveFilterState();
     var f = getFiltered();
     renderStats();
     renderFilters(f);
@@ -736,6 +759,7 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
     if (e.target.closest('[data-clear]')) {
       S.types = []; S.range = 'all';
       S.sources = DEFAULT_SOURCES.slice();
+      try { localStorage.removeItem(_FILTER_KEY); } catch (e) {}
       var f = getFiltered(); renderFilters(f); renderEvents(f);
     }
   });
@@ -769,6 +793,8 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
   /* ── Init ──────────────────────────────────────────────────────────────── */
   S.sync = new Date().toLocaleTimeString(undefined,
     { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  history.scrollRestoration = 'manual';
+  window.scrollTo(0, 0);
   renderAll();
 
 }());
