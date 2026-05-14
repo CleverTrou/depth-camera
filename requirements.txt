@@ -1,7 +1,7 @@
 # Depth Camera — Python dependencies
 # All run on Raspberry Pi 5 (ARM64, no GPU)
 
-flask>=3.0
+flask>=3.1.3
 pyyaml>=6.0.3
 requests>=2.34.1
 
