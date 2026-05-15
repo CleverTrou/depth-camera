@@ -67,7 +67,7 @@ def process_event(
     depth_input_size: int = 518,
     colormap: str = "inferno",
     camera_hfov_deg: float = 113.0,
-    ply_depth_scale: float = 2.5,
+    ply_depth_scale: float = 1.5,
     ply_ground_correction: bool = True,
     ntfy_topic_url: str | None = None,
     extra_metadata: dict | None = None,

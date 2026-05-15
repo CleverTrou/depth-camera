@@ -62,7 +62,7 @@ DEFAULT_CONFIG = {
         "depth_input_size": 518,
         "colormap": "inferno",
         "camera_hfov_deg": 113.0,
-        "ply_depth_scale": 2.5,
+        "ply_depth_scale": 1.5,
         "ply_ground_correction": True,
     },
     "notifications": {
