@@ -103,20 +103,36 @@ log = logging.getLogger("monitor")
 # ---------------------------------------------------------------------------
 
 
-def capture_raw_frame(rtsp_url, transport, width, height):
-    """Capture a low-res raw RGB frame for motion comparison."""
+def capture_raw_from_ring(ring_dir: str, segment_seconds: int,
+                          width: int, height: int) -> bytes | None:
+    """Capture a low-res raw RGB frame from the ring buffer for motion comparison.
+
+    Reads from the most recently completed segment rather than opening a fresh
+    RTSP connection. This keeps the total concurrent RTSP session count at one
+    (the ring buffer's persistent ffmpeg), preventing the camera from dropping
+    that session and triggering ring-buffer restarts with corrupted frames.
+    """
+    ring_path = Path(ring_dir)
+    segments = sorted(ring_path.glob("seg_*.ts"), key=lambda p: p.stat().st_mtime)
+
+    if len(segments) < 2:
+        return None
+
+    seg = segments[-2]  # newest completed; [-1] is still being written
+
+    if time.time() - seg.stat().st_mtime > segment_seconds * 3:
+        return None  # ring buffer stale
+
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
-        "-rtsp_transport", transport,
-        "-skip_frame", "nokey",
-        "-i", rtsp_url,
+        "-i", str(seg),
         "-vframes", "1",
         "-vf", f"scale={width}:{height}",
         "-f", "rawvideo", "-pix_fmt", "rgb24",
         "pipe:1",
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, timeout=15)
+        result = subprocess.run(cmd, capture_output=True, timeout=10)
         if result.returncode != 0:
             return None
         expected = width * height * 3
@@ -156,7 +172,7 @@ def save_motion_diff(
         vis[motion_mask, 2] = 0
 
         img = Image.fromarray(vis.clip(0, 255).astype(np.uint8))
-        img = img.resize((width * 3, height * 3), Image.NEAREST)
+        img = img.resize((width * 12, height * 12), Image.NEAREST)
         img.save(event_dir / "motion_diff.jpg", quality=85)
     except (ImportError, ValueError, OSError) as e:
         log.warning(f"Failed to save motion diff: {e}")
@@ -245,8 +261,8 @@ def main():
 
         now = time.time()
 
-        current = capture_raw_frame(
-            cam["rtsp_url"], cam["rtsp_transport"],
+        current = capture_raw_from_ring(
+            ring["dir"], ring["segment_seconds"],
             det["compare_width"], det["compare_height"],
         )
         if current is None:
