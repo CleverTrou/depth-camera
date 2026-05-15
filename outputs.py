@@ -211,7 +211,10 @@ def generate_pointcloud(
             R = _rotation_align(normal)
             pts = np.stack([x, y, z], axis=1) @ R.T
             x, y, z = pts[:, 0], pts[:, 1], pts[:, 2]
-            log.info("Ground plane corrected via RANSAC")
+            log.info(
+                f"Ground plane corrected via RANSAC "
+                f"(normal=[{normal[0]:.3f}, {normal[1]:.3f}, {normal[2]:.3f}])"
+            )
         else:
             log.info("RANSAC ground correction skipped (no dominant plane found)")
 
