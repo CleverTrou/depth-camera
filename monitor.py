@@ -44,8 +44,8 @@ DEFAULT_CONFIG = {
     },
     "detection": {
         "poll_interval": 3,
-        "compare_width": 80,
-        "compare_height": 60,
+        "compare_width": 320,
+        "compare_height": 240,
         "threshold": 20,
         "min_changed_pct": 5.0,
         # 30s was producing ~90 triggers/hour on a windy day (sustained motion
