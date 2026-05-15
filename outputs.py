@@ -197,10 +197,13 @@ def generate_pointcloud(
     d = d[mask]
     colors = colors[mask]
 
-    # Convert to 3D: Z increases away from camera
-    z = (1.0 - d) * depth_scale
-    x = (xx - cx) * z / fx
-    y = (yy - cy) * z / fy
+    # Convert to 3D. Compute X and Y from unscaled Z so that depth_scale
+    # stretches only the depth axis — not X/Y too (which would be a uniform
+    # scale with no effect on the wide-vs-deep aspect ratio).
+    z_raw = 1.0 - d
+    x = (xx - cx) * z_raw / fx
+    y = (yy - cy) * z_raw / fy
+    z = z_raw * depth_scale
 
     # RANSAC ground-plane correction: fit a plane to the lower 40% of the
     # frame, then rotate the whole cloud so that plane is horizontal.

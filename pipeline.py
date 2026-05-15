@@ -152,6 +152,7 @@ def process_event(
             "elapsed_s": round(elapsed, 1),
             "depth_input_size": depth_input_size,
             "ply_downsample": ply_downsample,
+            "ply_depth_scale": ply_depth_scale,
             "image_size": list(pil_image.size),
         }
         if extra_metadata:
