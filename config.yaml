@@ -56,6 +56,14 @@ pipeline:
   # Depth visualization colormap: inferno, viridis, magma, turbo
   colormap: "inferno"
 
+  # Camera horizontal field of view (degrees) for point cloud projection.
+  # Aqara G5 Pro: ~113° derived from 120° diagonal spec over a 16:9 sensor.
+  # Incorrect FOV causes ground-plane bowing. Tune until the ground looks flat.
+  camera_hfov_deg: 113.0
+
+  # Fit the ground plane via RANSAC and rotate the cloud so it is flat.
+  ply_ground_correction: true
+
 depth_model:
   # Path to the Depth Anything V2 Small ONNX model.
   # Downloaded automatically on first run if not present.
