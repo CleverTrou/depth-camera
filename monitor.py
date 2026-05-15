@@ -128,7 +128,7 @@ def capture_raw_frame(rtsp_url, transport, width, height):
 
 
 def save_motion_diff(
-    background_lum: Optional[Any],
+    background_lum: "Optional[np.ndarray]",
     current: bytes,
     width: int,
     height: int,
@@ -162,9 +162,9 @@ def save_motion_diff(
         log.warning(f"Failed to save motion diff: {e}")
 
 
-def compute_frame_diff(background_lum: Optional[Any], current_bytes: bytes,
+def compute_frame_diff(background_lum: "Optional[np.ndarray]", current_bytes: bytes,
                        width: int, height: int, threshold: int,
-                       alpha: float = 0.9) -> tuple[float, float, Any]:
+                       alpha: float = 0.9) -> "tuple[float, float, np.ndarray]":
     """Diff current frame against EWMA background. Returns (mean_diff, pct_changed, updated_background).
 
     The background is an exponential moving average of past frames
@@ -253,13 +253,15 @@ def main():
             confirm_count = 0
             continue
 
+        is_first = background_lum is None
+        pre_update_bg = background_lum
         mean_diff, pct, background_lum = compute_frame_diff(
             background_lum, current,
             det["compare_width"], det["compare_height"],
             det["threshold"], alpha,
         )
 
-        if background_lum is None:
+        if is_first:
             continue  # first frame; background just initialised, nothing to compare
 
         in_cooldown = (now - last_trigger) < det["cooldown"]
@@ -332,7 +334,7 @@ def main():
                         log.info(f"Event {result['event_id']} processed in {result['elapsed_s']}s")
                         event_dir = Path(pipe["data_dir"]) / "events" / result["event_id"]
                         save_motion_diff(
-                            background_lum, current,
+                            pre_update_bg, current,
                             det["compare_width"], det["compare_height"],
                             det["threshold"], event_dir,
                         )
