@@ -21,6 +21,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any, Optional
 
 import numpy as np
 import yaml
@@ -43,8 +44,8 @@ DEFAULT_CONFIG = {
     },
     "detection": {
         "poll_interval": 3,
-        "compare_width": 80,
-        "compare_height": 60,
+        "compare_width": 320,
+        "compare_height": 240,
         "threshold": 20,
         "min_changed_pct": 5.0,
         # 30s was producing ~90 triggers/hour on a windy day (sustained motion
@@ -54,6 +55,7 @@ DEFAULT_CONFIG = {
         "confirm_frames": 2,
         "lookback_s": 2,
         "snapshot_quality": 2,
+        "bg_alpha": 0.9,
     },
     "pipeline": {
         "data_dir": "/data/depth-camera",
@@ -101,20 +103,36 @@ log = logging.getLogger("monitor")
 # ---------------------------------------------------------------------------
 
 
-def capture_raw_frame(rtsp_url, transport, width, height):
-    """Capture a low-res raw RGB frame for motion comparison."""
+def capture_raw_from_ring(ring_dir: str, segment_seconds: int,
+                          width: int, height: int) -> bytes | None:
+    """Capture a low-res raw RGB frame from the ring buffer for motion comparison.
+
+    Reads from the most recently completed segment rather than opening a fresh
+    RTSP connection. This keeps the total concurrent RTSP session count at one
+    (the ring buffer's persistent ffmpeg), preventing the camera from dropping
+    that session and triggering ring-buffer restarts with corrupted frames.
+    """
+    ring_path = Path(ring_dir)
+    segments = sorted(ring_path.glob("seg_*.ts"), key=lambda p: p.stat().st_mtime)
+
+    if len(segments) < 2:
+        return None
+
+    seg = segments[-2]  # newest completed; [-1] is still being written
+
+    if time.time() - seg.stat().st_mtime > segment_seconds * 3:
+        return None  # ring buffer stale
+
     cmd = [
         "ffmpeg", "-y", "-loglevel", "error",
-        "-rtsp_transport", transport,
-        "-skip_frame", "nokey",
-        "-i", rtsp_url,
+        "-i", str(seg),
         "-vframes", "1",
         "-vf", f"scale={width}:{height}",
         "-f", "rawvideo", "-pix_fmt", "rgb24",
         "pipe:1",
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, timeout=15)
+        result = subprocess.run(cmd, capture_output=True, timeout=10)
         if result.returncode != 0:
             return None
         expected = width * height * 3
@@ -126,7 +144,7 @@ def capture_raw_frame(rtsp_url, transport, width, height):
 
 
 def save_motion_diff(
-    reference: bytes,
+    background_lum: "Optional[np.ndarray]",
     current: bytes,
     width: int,
     height: int,
@@ -138,15 +156,14 @@ def save_motion_diff(
         from PIL import Image
 
         expected = width * height * 3
-        if len(reference) < expected or len(current) < expected:
+        if background_lum is None or len(current) < expected:
             return
 
-        ref = np.frombuffer(reference[:expected], dtype=np.uint8).reshape(height, width, 3).astype(float)
         cur = np.frombuffer(current[:expected], dtype=np.uint8).reshape(height, width, 3).astype(float)
-
-        ref_lum = ref.mean(axis=2)
         cur_lum = cur.mean(axis=2)
-        diffs = cur_lum - ref_lum
+        bg_lum = background_lum.reshape(height, width)
+
+        diffs = cur_lum - bg_lum
         motion_mask = np.abs(diffs - float(diffs.mean())) > threshold
 
         vis = cur * 0.45
@@ -155,33 +172,39 @@ def save_motion_diff(
         vis[motion_mask, 2] = 0
 
         img = Image.fromarray(vis.clip(0, 255).astype(np.uint8))
-        img = img.resize((width * 3, height * 3), Image.NEAREST)
+        img = img.resize((width * 12, height * 12), Image.NEAREST)
         img.save(event_dir / "motion_diff.jpg", quality=85)
     except (ImportError, ValueError, OSError) as e:
         log.warning(f"Failed to save motion diff: {e}")
 
 
-def compute_frame_diff(frame_a, frame_b, threshold):
-    """Compare two raw RGB frames. Returns (mean_diff, pct_changed).
+def compute_frame_diff(background_lum: "Optional[np.ndarray]", current_bytes: bytes,
+                       width: int, height: int, threshold: int,
+                       alpha: float = 0.9) -> "tuple[float, float, np.ndarray]":
+    """Diff current frame against EWMA background. Returns (mean_diff, pct_changed, updated_background).
 
-    Brightness-normalised: subtracts the per-frame mean luminance before
-    comparing so global auto-exposure shifts don't register as motion.
-    mean_diff is the raw (un-normalised) mean absolute diff for metadata.
+    The background is an exponential moving average of past frames
+    (background = alpha*background + (1-alpha)*current). Persistent scene
+    motion (wind, shadows) gets absorbed; sudden changes (person appearing)
+    spike above it. Brightness-normalised so auto-exposure shifts don't fire.
     """
-    if len(frame_a) != len(frame_b):
-        return 0.0, 0.0
+    expected = width * height * 3
+    if len(current_bytes) < expected:
+        return 0.0, 0.0, background_lum
 
-    a = np.frombuffer(frame_a, dtype=np.uint8).reshape(-1, 3).mean(axis=1)
-    b = np.frombuffer(frame_b, dtype=np.uint8).reshape(-1, 3).mean(axis=1)
+    cur_lum = np.frombuffer(current_bytes[:expected], dtype=np.uint8).reshape(-1, 3).mean(axis=1)
 
-    diffs = a - b
+    if background_lum is None:
+        return 0.0, 0.0, cur_lum.copy()
+
+    diffs = cur_lum - background_lum
     total_abs_mean = float(np.abs(diffs).mean())
-
-    # mean_signed captures global brightness shift (auto-exposure, sunrise, etc.)
     mean_signed = float(diffs.mean())
     changed_count = int(np.sum(np.abs(diffs - mean_signed) > threshold))
 
-    return total_abs_mean, (changed_count / len(a)) * 100
+    updated_bg = alpha * background_lum + (1.0 - alpha) * cur_lum
+
+    return total_abs_mean, (changed_count / len(cur_lum)) * 100, updated_bg
 
 
 # ---------------------------------------------------------------------------
@@ -223,25 +246,12 @@ def main():
     from depth import load_model
     load_model()
 
-    # Capture reference frame
-    log.info("Capturing reference frame...")
-    reference = None
-    while reference is None and running:
-        reference = capture_raw_frame(
-            cam["rtsp_url"], cam["rtsp_transport"],
-            det["compare_width"], det["compare_height"],
-        )
-        if reference is None:
-            log.warning("Failed — retrying in 5s...")
-            time.sleep(5)
-
-    if not running:
-        return
-
-    log.info("Reference captured. Monitoring...")
+    log.info("Building background model...")
 
     last_trigger = 0.0
     confirm_count = 0
+    background_lum: Optional[Any] = None
+    alpha = float(det.get("bg_alpha", 0.9))
     pct_window: list[tuple[float, float]] = []  # (pct, mean_diff) per poll
     samples_per_minute = max(1, int(60 / det["poll_interval"]))
     min_mean_diff = det.get("min_mean_diff", 0)
@@ -251,15 +261,25 @@ def main():
 
         now = time.time()
 
-        current = capture_raw_frame(
-            cam["rtsp_url"], cam["rtsp_transport"],
+        current = capture_raw_from_ring(
+            ring["dir"], ring["segment_seconds"],
             det["compare_width"], det["compare_height"],
         )
         if current is None:
             confirm_count = 0
             continue
 
-        mean_diff, pct = compute_frame_diff(reference, current, det["threshold"])
+        is_first = background_lum is None
+        pre_update_bg = background_lum
+        mean_diff, pct, background_lum = compute_frame_diff(
+            background_lum, current,
+            det["compare_width"], det["compare_height"],
+            det["threshold"], alpha,
+        )
+
+        if is_first:
+            continue  # first frame; background just initialised, nothing to compare
+
         in_cooldown = (now - last_trigger) < det["cooldown"]
 
         # Rolling minute summary so we can see the noise floor without
@@ -282,12 +302,6 @@ def main():
             pct_window = []
 
         if in_cooldown:
-            # Adapt the reference during cooldown so it reflects the current
-            # scene by the time we're ready to detect again. Without this, a
-            # stale reference (e.g. captured at a different time of day) causes
-            # every poll to appear as motion and the monitor fires on every
-            # cooldown expiry instead of on actual events.
-            reference = current
             confirm_count = 0
         elif pct >= det["min_changed_pct"] and mean_diff >= min_mean_diff:
             confirm_count += 1
@@ -336,7 +350,7 @@ def main():
                         log.info(f"Event {result['event_id']} processed in {result['elapsed_s']}s")
                         event_dir = Path(pipe["data_dir"]) / "events" / result["event_id"]
                         save_motion_diff(
-                            reference, current,
+                            pre_update_bg, current,
                             det["compare_width"], det["compare_height"],
                             det["threshold"], event_dir,
                         )
@@ -345,7 +359,6 @@ def main():
                 confirm_count = 0
         else:
             confirm_count = 0
-            reference = current
 
     log.info("Monitor stopped.")
 
