@@ -61,6 +61,8 @@ DEFAULT_CONFIG = {
         "ply_downsample": 2,
         "depth_input_size": 518,
         "colormap": "inferno",
+        "camera_hfov_deg": 113.0,
+        "ply_ground_correction": True,
     },
     "notifications": {
         "webhook_heartbeat_url": "",
@@ -169,6 +171,8 @@ def _capture_and_process(source, event_type, lookback_override=None):
         ply_downsample=pipe["ply_downsample"],
         depth_input_size=pipe["depth_input_size"],
         colormap=pipe["colormap"],
+        camera_hfov_deg=pipe.get("camera_hfov_deg", 113.0),
+        ply_ground_correction=pipe.get("ply_ground_correction", True),
         ntfy_topic_url=ntfy_url,
     )
 

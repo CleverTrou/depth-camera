@@ -66,6 +66,8 @@ def process_event(
     ply_downsample: int = 2,
     depth_input_size: int = 518,
     colormap: str = "inferno",
+    camera_hfov_deg: float = 113.0,
+    ply_ground_correction: bool = True,
     ntfy_topic_url: str | None = None,
     extra_metadata: dict | None = None,
 ) -> dict | None:
@@ -130,7 +132,11 @@ def process_event(
         # Step 3: Generate outputs
         generate_colormap(depth_map, event_dir / "depth_colormap.jpg", colormap)
         generate_depth_image(depth_map, event_dir / "depth_map.png")
-        generate_pointcloud(rgb, depth_map, event_dir / "pointcloud.ply", ply_downsample)
+        generate_pointcloud(
+            rgb, depth_map, event_dir / "pointcloud.ply",
+            ply_downsample, hfov_deg=camera_hfov_deg,
+            ground_correction=ply_ground_correction,
+        )
 
         elapsed = time.time() - t_start
         log.info(f"[{event_id}] Pipeline complete in {elapsed:.1f}s")
