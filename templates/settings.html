@@ -304,7 +304,7 @@ var camSelect  = document.getElementById('cam-select');
 function updateDbHfov() {
   var diag = parseFloat(diagInput ? diagInput.value : '');
   if (isNaN(diag) || diag <= 0) { if (dbResult) dbResult.style.display = 'none'; return; }
-  fetch('/api/compute-hfov?diag_fov=' + diag)
+  fetch('/api/compute-hfov?diag_fov=' + diag + '&width={{ snap_width }}&height={{ snap_height }}')
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (d.hfov && dbHfovSpan && dbResult) {

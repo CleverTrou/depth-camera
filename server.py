@@ -343,10 +343,16 @@ def _read_deployed_config() -> dict:
     return {}
 
 
-def _write_deployed_config(raw: dict) -> None:
-    if _config_path:
+def _write_deployed_config(raw: dict) -> str | None:
+    """Write config; returns an error string on failure, None on success."""
+    if not _config_path:
+        return "No config file path — start the server with --config."
+    try:
         with open(_config_path, "w") as f:
             yaml.dump(raw, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        return None
+    except OSError as e:
+        return f"Could not write config: {e}"
 
 
 def _restart_service(name: str) -> bool:
@@ -396,17 +402,16 @@ def settings_page():
         raw.setdefault("gallery", {})["pin"] = new_pin
 
         if not errors:
-            _write_deployed_config(raw)
-            relay_ok    = _restart_service("depth-relay")
-            monitor_ok  = _restart_service("depth-monitor")
-            gallery_ok  = _restart_service("depth-gallery")
-            saved = ["Settings saved."]
-            if not relay_ok:    saved.append("Warning: could not restart depth-relay.")
-            if not monitor_ok:  saved.append("Warning: could not restart depth-monitor.")
-            if gallery_ok:
-                # If we restarted the gallery server, the response still goes out
-                # because Flask already grabbed the socket reference.
-                pass
+            write_err = _write_deployed_config(raw)
+            if write_err:
+                errors.append(write_err)
+            else:
+                relay_ok   = _restart_service("depth-relay")
+                monitor_ok = _restart_service("depth-monitor")
+                saved = ["Settings saved."]
+                if not relay_ok:   saved.append("Warning: could not restart depth-relay.")
+                if not monitor_ok: saved.append("Warning: could not restart depth-monitor.")
+                saved.append("Gallery PIN/config changes take effect after the next manual gallery restart.")
 
     raw = _read_deployed_config()
     current = {
@@ -416,23 +421,31 @@ def settings_page():
         "ply_downsample":                raw.get("pipeline", {}).get("ply_downsample", 2),
         "ply_ground_correction":         raw.get("pipeline", {}).get("ply_ground_correction", True),
         "monitor_lookback_s":            raw.get("detection", {}).get("lookback_s", 2),
-        "monitor_min_changed_pct":       raw.get("detection", {}).get("min_changed_pct", 15.0),
-        "monitor_confirm_frames":        raw.get("detection", {}).get("confirm_frames", 2),
+        "monitor_min_changed_pct":       raw.get("detection", {}).get("min_changed_pct", 20.0),
+        "monitor_confirm_frames":        raw.get("detection", {}).get("confirm_frames", 3),
         "monitor_cooldown":              raw.get("detection", {}).get("cooldown", 300),
         "monitor_diff_display_threshold": raw.get("detection", {}).get("diff_display_threshold", 40),
         "gallery_pin":                   raw.get("gallery", {}).get("pin", ""),
         "monitor_active":                _service_active("depth-monitor"),
     }
-    # Most recent snapshot for the FOV two-point tool
+    # Most recent snapshot + image dimensions for the FOV two-point tool
     recent_snap = None
+    snap_width, snap_height = 2688, 1520  # Aqara G5 Pro defaults
     events_dir = _events_dir()
     if events_dir.exists():
         try:
             dirs = sorted(events_dir.iterdir(), key=lambda p: p.name, reverse=True)
             for d in dirs:
-                s = d / "snapshot.jpg"
-                if s.exists():
+                if (d / "snapshot.jpg").exists():
                     recent_snap = d.name
+                    meta_f = d / "metadata.json"
+                    if meta_f.exists():
+                        try:
+                            meta = json.loads(meta_f.read_text())
+                            if isinstance(meta, dict) and meta.get("image_size"):
+                                snap_width, snap_height = meta["image_size"]
+                        except (json.JSONDecodeError, OSError, TypeError, ValueError):
+                            pass
                     break
         except OSError:
             pass
@@ -441,6 +454,8 @@ def settings_page():
                            current=current,
                            camera_db=CAMERA_DB,
                            recent_snap=recent_snap,
+                           snap_width=snap_width,
+                           snap_height=snap_height,
                            saved=saved,
                            errors=errors)
 
