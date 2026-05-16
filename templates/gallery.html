@@ -766,41 +766,39 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
     if (ft) {
       var t = ft.dataset.filterType, idx = S.types.indexOf(t);
       if (idx === -1) S.types.push(t); else S.types.splice(idx, 1);
-      S.visible = 20;
-      var f = getFiltered(); renderFilters(f); renderEvents(f); return;
+      S.visible = 20; renderAll(); return;
     }
     var fs = e.target.closest('[data-filter-source]');
     if (fs) {
       var src = fs.dataset.filterSource, sIdx = S.sources.indexOf(src);
       if (sIdx === -1) S.sources.push(src); else S.sources.splice(sIdx, 1);
-      S.visible = 20;
-      var f = getFiltered(); renderFilters(f); renderEvents(f); return;
+      S.visible = 20; renderAll(); return;
     }
     var fr = e.target.closest('[data-filter-range]');
     if (fr) {
       S.range = fr.dataset.filterRange;
-      S.visible = 20;
-      var f = getFiltered(); renderFilters(f); renderEvents(f); return;
+      S.visible = 20; renderAll(); return;
     }
     var fl = e.target.closest('[data-layout]');
     if (fl) {
       S.layout = fl.dataset.layout;
-      var f = getFiltered(); renderFilters(f); renderEvents(f); return;
+      renderAll(); return;
     }
     if (e.target.closest('[data-clear]')) {
       S.types = []; S.range = 'all';
       S.sources = DEFAULT_SOURCES.slice();
       S.visible = 20;
       try { localStorage.removeItem(_FILTER_KEY); } catch (e) {}
-      var f = getFiltered(); renderFilters(f); renderEvents(f); return;
+      renderAll(); return;
     }
     if (e.target.closest('[data-show-more]')) {
       S.visible += 20;
-      var f = getFiltered(); renderEvents(f); return;
+      renderEvents(getFiltered()); return;
     }
     if (e.target.closest('[data-show-all]')) {
-      S.visible = getFiltered().length;
-      var f = getFiltered(); renderEvents(f); return;
+      var f = getFiltered();
+      S.visible = f.length;
+      renderEvents(f); return;
     }
   });
 
