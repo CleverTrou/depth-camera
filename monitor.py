@@ -368,7 +368,7 @@ def main():
                             pre_update_bg, current,
                             det["compare_width"], det["compare_height"],
                             det["threshold"], event_dir,
-                            display_threshold=det.get("diff_display_threshold", 0),
+                            display_threshold=det.get("diff_display_threshold") or 0,
                         )
 
                 last_trigger = now
