@@ -197,13 +197,20 @@ def generate_pointcloud(
     d = d[mask]
     colors = colors[mask]
 
-    # Convert to 3D. Compute X and Y from unscaled Z so that depth_scale
-    # stretches only the depth axis — not X/Y too (which would be a uniform
-    # scale with no effect on the wide-vs-deep aspect ratio).
-    z_raw = 1.0 - d
-    x = (xx - cx) * z_raw / fx
-    y = (yy - cy) * z_raw / fy
-    z = z_raw * depth_scale
+    # Convert to 3D with perspective depth correction.
+    # The depth model predicts along-ray distance; we need orthogonal z-depth.
+    # For a pixel at angle θ from the optical axis: z_ortho = z_ray * cos(θ).
+    # Without this, wide-angle edge pixels appear ~45% too deep, creating the
+    # characteristic bowl/U distortion on flat surfaces like a patio floor.
+    z_ray = 1.0 - d
+    nx = (xx - cx) / fx  # normalised ray direction (= tan θ_x)
+    ny = (yy - cy) / fy  # normalised ray direction (= tan θ_y)
+    cos_theta = 1.0 / np.sqrt(1.0 + nx ** 2 + ny ** 2)
+    z_ortho = z_ray * cos_theta  # orthogonal depth
+
+    x = nx * z_ortho
+    y = ny * z_ortho
+    z = z_ortho * depth_scale
 
     # RANSAC ground-plane correction: fit a plane to the lower 40% of the
     # frame, then rotate the whole cloud so that plane is horizontal.
