@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Settings — Depth Camera</title>
+<style>
+:root {
+  --accent-h: 200; --accent-c: 0.13; --accent-l: 0.78;
+  --accent: oklch(var(--accent-l) var(--accent-c) var(--accent-h));
+  --bg:        oklch(0.16 0.004 250);
+  --bg-1:      oklch(0.20 0.004 250);
+  --bg-2:      oklch(0.24 0.005 250);
+  --line:      oklch(0.30 0.005 250);
+  --line-soft: oklch(0.25 0.005 250);
+  --fg:        oklch(0.96 0.005 250);
+  --fg-mid:    oklch(0.72 0.008 250);
+  --fg-dim:    oklch(0.52 0.008 250);
+  --fg-faint:  oklch(0.38 0.008 250);
+  --radius: 10px;
+  color-scheme: dark;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; font-size: 14px; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+a { color: inherit; text-decoration: none; }
+input, select { font: inherit; color: var(--fg); background: var(--bg-1); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; width: 100%; }
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+input[type=checkbox] { width: auto; accent-color: var(--accent); transform: scale(1.25); cursor: pointer; }
+label { color: var(--fg-mid); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-row { display: flex; align-items: center; gap: 12px; }
+.field-hint { color: var(--fg-faint); font-size: 11px; margin-top: 2px; }
+
+.page { max-width: 760px; margin: 0 auto; padding: 24px 20px 60px; }
+.page-header { display: flex; align-items: center; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--line-soft); margin-bottom: 28px; }
+.page-header a { color: var(--fg-mid); font-size: 18px; }
+.page-header a:hover { color: var(--accent); }
+.page-title { font-size: 20px; font-weight: 600; }
+
+.section { background: var(--bg-1); border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.section-title { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-mid); margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line-soft); }
+.fields { display: flex; flex-direction: column; gap: 16px; }
+.fields-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 520px) { .fields-row { grid-template-columns: 1fr; } }
+
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 500; background: var(--bg-2); color: var(--fg); border: 1px solid var(--line); cursor: pointer; transition: border-color 120ms, color 120ms; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn--primary { background: var(--accent); color: oklch(0.15 0.02 var(--accent-h)); border-color: var(--accent); }
+.btn--primary:hover { background: oklch(calc(var(--accent-l) + 0.04) var(--accent-c) var(--accent-h)); }
+.btn--sm { padding: 5px 10px; font-size: 12px; }
+.btn--danger { border-color: oklch(0.4 0.12 25); color: oklch(0.75 0.14 25); }
+.btn--danger:hover { background: oklch(0.25 0.08 25); border-color: oklch(0.7 0.14 25); }
+
+.banner { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
+.banner--ok    { background: oklch(0.20 0.05 145); border: 1px solid oklch(0.35 0.1 145); color: oklch(0.85 0.12 145); }
+.banner--error { background: oklch(0.20 0.05 25);  border: 1px solid oklch(0.35 0.1 25);  color: oklch(0.85 0.14 25); }
+
+.fov-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.fov-tab { padding: 5px 12px; border-radius: 6px; font-size: 12px; border: 1px solid var(--line-soft); color: var(--fg-mid); cursor: pointer; background: none; }
+.fov-tab.active { border-color: var(--accent); color: var(--accent); background: oklch(0.18 0.03 var(--accent-h)); }
+.fov-panel { display: none; }
+.fov-panel.active { display: block; }
+
+.snap-wrap { position: relative; display: inline-block; max-width: 100%; cursor: crosshair; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.snap-wrap img { display: block; max-width: 100%; height: auto; pointer-events: none; }
+#fov-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.fov-inputs { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; margin-top: 12px; }
+.fov-result { margin-top: 10px; font-size: 13px; color: var(--fg-mid); display: none; }
+
+.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.toggle-label { font-size: 14px; font-weight: 500; }
+.toggle-status { font-size: 12px; }
+.toggle-status.is-active   { color: oklch(0.78 0.18 145); }
+.toggle-status.is-inactive { color: var(--fg-faint); }
+
+.save-bar { position: sticky; bottom: 0; background: var(--bg); border-top: 1px solid var(--line-soft); padding: 14px 0; margin-top: 24px; display: flex; align-items: center; gap: 12px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="page-header">
+    <a href="/" title="Back to gallery">&#x2039;</a>
+    <div class="page-title">Settings</div>
+  </div>
+
+  {% for msg in saved %}
+  <div class="banner banner--ok">{{ msg }}</div>
+  {% endfor %}
+  {% for msg in errors %}
+  <div class="banner banner--error">{{ msg }}</div>
+  {% endfor %}
+
+  <form method="POST" action="/settings">
+
+    <!-- ── Camera ──────────────────────────────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">Camera</div>
+      <div class="fields">
+
+        <div class="field">
+          <label>IFTTT Lookback (seconds)</label>
+          <input type="number" name="relay_lookback_s" value="{{ current.relay_lookback_s }}" min="1" max="30" step="0.5">
+          <div class="field-hint">How far back into the ring buffer when an IFTTT trigger arrives. The Aqara cloud typically adds 5–7 s delay.</div>
+        </div>
+
+        <div class="field">
+          <label>Camera Horizontal FOV (degrees)</label>
+          <input type="number" id="hfov-input" name="camera_hfov_deg" value="{{ current.camera_hfov_deg }}" min="30" max="180" step="0.1">
+          <div class="field-hint">Used for point-cloud back-projection. Wrong FOV causes ground-plane bowing. Use the detector below.</div>
+        </div>
+
+        <details style="margin-top:4px">
+          <summary style="cursor:pointer;color:var(--fg-mid);font-size:13px;user-select:none">&#9654; Detect FOV automatically</summary>
+          <div style="padding:14px 0 4px">
+            <div class="fov-tabs">
+              <button type="button" class="fov-tab active" data-tab="db">From camera specs</button>
+              <button type="button" class="fov-tab" data-tab="measure">Two-point measurement</button>
+              <button type="button" class="fov-tab" data-tab="probe">Probe RTSP stream</button>
+            </div>
+
+            <!-- Specs database -->
+            <div class="fov-panel active" id="tab-db">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end">
+                <div class="field">
+                  <label>Camera model</label>
+                  <select id="cam-select">
+                    <option value="">— select your camera —</option>
+                    {% for name, info in camera_db.items() %}
+                    <option value="{{ info.diag_fov }}">{{ name }} ({{ info.note }})</option>
+                    {% endfor %}
+                    <option value="">Other — enter diagonal FOV below</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label>Or: diagonal FOV from manual</label>
+                  <input type="number" id="diag-fov-input" placeholder="e.g. 120" min="30" max="250" step="0.5">
+                </div>
+              </div>
+              <div class="fov-result" id="db-result">
+                Computed horizontal FOV: <span id="db-hfov" style="color:var(--accent);font-weight:600"></span>°
+                <button type="button" class="btn btn--sm" style="margin-left:10px" id="db-apply-btn">Apply →</button>
+              </div>
+            </div>
+
+            <!-- Two-point measurement -->
+            <div class="fov-panel" id="tab-measure">
+              {% if recent_snap %}
+              <p style="color:var(--fg-faint);font-size:12px;margin-bottom:10px">
+                Click two points in the image at the same distance from the camera whose real separation you know (e.g. fence posts, chalk marks on the ground).
+              </p>
+              <div class="snap-wrap">
+                <img id="measure-img" src="/events/{{ recent_snap }}/snapshot.jpg" alt="snapshot" onload="initCanvas(this)">
+                <canvas id="fov-canvas"></canvas>
+              </div>
+              <div class="fov-inputs">
+                <div class="field">
+                  <label>Real separation (m)</label>
+                  <input type="number" id="sep-m" placeholder="e.g. 2.0" min="0.1" step="0.1">
+                </div>
+                <div class="field">
+                  <label>Horizontal distance from camera (m)</label>
+                  <input type="number" id="depth-m" placeholder="e.g. 5.0" min="0.5" step="0.1">
+                </div>
+                <button type="button" class="btn" onclick="computeFOVFromPoints()">Compute</button>
+              </div>
+              <div class="fov-result" id="measure-result">
+                Computed horizontal FOV: <span id="measure-hfov" style="color:var(--accent);font-weight:600"></span>°
+                <button type="button" class="btn btn--sm" style="margin-left:10px" id="measure-apply-btn">Apply →</button>
+              </div>
+              <p id="measure-hint" style="color:var(--fg-faint);font-size:11px;margin-top:8px">Click two points on the image to begin.</p>
+              {% else %}
+              <p style="color:var(--fg-faint)">No events captured yet — trigger a capture first.</p>
+              {% endif %}
+            </div>
+
+            <!-- Probe RTSP -->
+            <div class="fov-panel" id="tab-probe">
+              <button type="button" class="btn" onclick="probeCamera()">Probe RTSP stream for camera model</button>
+              <div id="probe-result" style="margin-top:12px;font-size:13px;color:var(--fg-mid)"></div>
+            </div>
+          </div>
+        </details>
+
+      </div>
+    </div>
+
+    <!-- ── Point Cloud ─────────────────────────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">Point Cloud</div>
+      <div class="fields">
+        <div class="fields-row">
+          <div class="field">
+            <label>Z Scale</label>
+            <input type="number" name="ply_depth_scale" value="{{ current.ply_depth_scale }}" min="0.1" max="10" step="0.1">
+            <div class="field-hint">Stretches depth axis vs X/Y. 1.5 ≈ 2:1 width-to-depth. Increase if scene looks flat front-to-back.</div>
+          </div>
+          <div class="field">
+            <label>Downsample (1=full, 2=¼, 4=1/16)</label>
+            <input type="number" name="ply_downsample" value="{{ current.ply_downsample }}" min="1" max="8" step="1">
+            <div class="field-hint">Higher = smaller file (~8 MB at 2, ~2 MB at 4).</div>
+          </div>
+        </div>
+        <div class="field-row">
+          <input type="checkbox" name="ply_ground_correction" id="gc-cb" {% if current.ply_ground_correction %}checked{% endif %}>
+          <label for="gc-cb" style="text-transform:none;font-size:14px;color:var(--fg)">RANSAC ground-plane correction (flattens the floor)</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Motion Detection ────────────────────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">Local Motion Detection (Pi Monitor)</div>
+      <div class="fields">
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label">depth-monitor service</div>
+            <div class="toggle-status {% if current.monitor_active %}is-active{% else %}is-inactive{% endif %}" id="monitor-status-text">
+              {% if current.monitor_active %}● Running{% else %}○ Stopped{% endif %}
+            </div>
+          </div>
+          {% if current.monitor_active %}
+          <button type="button" class="btn btn--danger btn--sm" onclick="toggleMonitor('stop')">Stop</button>
+          {% else %}
+          <button type="button" class="btn btn--sm" onclick="toggleMonitor('start')">Start</button>
+          {% endif %}
+        </div>
+
+        <div class="fields-row">
+          <div class="field">
+            <label>Lookback (seconds)</label>
+            <input type="number" name="monitor_lookback_s" value="{{ current.monitor_lookback_s }}" min="0" max="15" step="0.5">
+          </div>
+          <div class="field">
+            <label>Min changed pixels (%)</label>
+            <input type="number" name="monitor_min_changed_pct" value="{{ current.monitor_min_changed_pct }}" min="1" max="80" step="0.5">
+            <div class="field-hint">EWMA p50 noise ≈ 1–4%. 10–20% catches only significant motion.</div>
+          </div>
+        </div>
+        <div class="fields-row">
+          <div class="field">
+            <label>Confirm frames (×3 s each)</label>
+            <input type="number" name="monitor_confirm_frames" value="{{ current.monitor_confirm_frames }}" min="1" max="10" step="1">
+            <div class="field-hint">Consecutive above-threshold polls before triggering. 2 = 6 s sustained.</div>
+          </div>
+          <div class="field">
+            <label>Cooldown (seconds)</label>
+            <input type="number" name="monitor_cooldown" value="{{ current.monitor_cooldown }}" min="30" max="3600" step="30">
+          </div>
+        </div>
+        <div class="field">
+          <label>Diff image display threshold (0–255, 0 = same as detection)</label>
+          <input type="number" name="monitor_diff_display_threshold" value="{{ current.monitor_diff_display_threshold }}" min="0" max="200" step="5">
+          <div class="field-hint">Higher = fewer orange pixels. 40 filters weak shadows without hiding real motion.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Gallery ─────────────────────────────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">Gallery</div>
+      <div class="field">
+        <label>PIN lock (leave blank to disable)</label>
+        <input type="text" name="gallery_pin" value="{{ current.gallery_pin }}" maxlength="20" autocomplete="off" placeholder="e.g. 482916">
+        <div class="field-hint">Protects all gallery pages. Change takes effect after save + restart.</div>
+      </div>
+    </div>
+
+    <div class="save-bar">
+      <button type="submit" class="btn btn--primary">Save &amp; restart services</button>
+      <a href="/" class="btn">Cancel</a>
+      <span style="color:var(--fg-faint);font-size:12px">Restarts depth-relay &amp; depth-monitor with new settings.</span>
+    </div>
+
+  </form>
+</div>
+
+<script>
+'use strict';
+
+// ── FOV tabs ──────────────────────────────────────────────────────────────
+document.querySelectorAll('.fov-tab').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.fov-tab').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('.fov-panel').forEach(function(p) { p.classList.remove('active'); });
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ── Apply FOV ─────────────────────────────────────────────────────────────
+function applyFOV(val) {
+  var n = parseFloat(val);
+  if (!isNaN(n)) document.getElementById('hfov-input').value = n;
+}
+
+// ── Camera database ───────────────────────────────────────────────────────
+var dbResult   = document.getElementById('db-result');
+var dbHfovSpan = document.getElementById('db-hfov');
+var dbApplyBtn = document.getElementById('db-apply-btn');
+var diagInput  = document.getElementById('diag-fov-input');
+var camSelect  = document.getElementById('cam-select');
+
+function updateDbHfov() {
+  var diag = parseFloat(diagInput ? diagInput.value : '');
+  if (isNaN(diag) || diag <= 0) { if (dbResult) dbResult.style.display = 'none'; return; }
+  fetch('/api/compute-hfov?diag_fov=' + diag)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.hfov && dbHfovSpan && dbResult) {
+        dbHfovSpan.textContent = d.hfov;
+        dbResult.style.display = 'block';
+      }
+    });
+}
+
+if (camSelect) {
+  camSelect.addEventListener('change', function() {
+    if (camSelect.value && diagInput) { diagInput.value = camSelect.value; updateDbHfov(); }
+  });
+}
+if (diagInput) diagInput.addEventListener('input', updateDbHfov);
+if (dbApplyBtn && dbHfovSpan) {
+  dbApplyBtn.addEventListener('click', function() { applyFOV(dbHfovSpan.textContent); });
+}
+
+// ── Two-point FOV measurement ─────────────────────────────────────────────
+var canvas = document.getElementById('fov-canvas');
+var ctx    = canvas ? canvas.getContext('2d') : null;
+var pts    = [];
+
+function initCanvas(imgEl) {
+  if (!canvas) return;
+  canvas.width  = imgEl.naturalWidth;
+  canvas.height = imgEl.naturalHeight;
+  canvas.style.width  = imgEl.offsetWidth  + 'px';
+  canvas.style.height = imgEl.offsetHeight + 'px';
+}
+
+if (canvas) {
+  canvas.addEventListener('click', function(e) {
+    if (pts.length >= 2) { pts = []; ctx.clearRect(0, 0, canvas.width, canvas.height); }
+    var rect  = canvas.getBoundingClientRect();
+    var sx = canvas.width  / rect.width;
+    var sy = canvas.height / rect.height;
+    var px = (e.clientX - rect.left) * sx;
+    var py = (e.clientY - rect.top)  * sy;
+    pts.push({x: px, y: py});
+    ctx.beginPath();
+    ctx.arc(px, py, 14, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,140,0,0.7)';
+    ctx.fill();
+    ctx.font = 'bold 22px monospace';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(pts.length), px, py);
+    if (pts.length === 2) {
+      ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); ctx.lineTo(pts[1].x, pts[1].y);
+      ctx.strokeStyle = 'rgba(255,140,0,0.7)'; ctx.lineWidth = 3; ctx.stroke();
+      document.getElementById('measure-hint').textContent = 'Points set. Enter distances and click Compute.';
+    } else {
+      document.getElementById('measure-hint').textContent = 'Click the second point.';
+    }
+  });
+  window.addEventListener('resize', function() {
+    var img = document.getElementById('measure-img');
+    if (img && img.complete) initCanvas(img);
+  });
+}
+
+function computeFOVFromPoints() {
+  if (pts.length < 2) { alert('Click two points on the image first.'); return; }
+  var sepEl   = document.getElementById('sep-m');
+  var depthEl = document.getElementById('depth-m');
+  var sepM    = parseFloat(sepEl   ? sepEl.value   : '');
+  var depthM  = parseFloat(depthEl ? depthEl.value : '');
+  if (isNaN(sepM) || isNaN(depthM) || sepM <= 0 || depthM <= 0) {
+    alert('Enter valid separation and distance values.'); return;
+  }
+  var pixSep   = Math.sqrt(Math.pow(pts[1].x - pts[0].x, 2) + Math.pow(pts[1].y - pts[0].y, 2));
+  var fx       = pixSep * depthM / sepM;
+  var hfov     = (2 * Math.atan(canvas.width / (2 * fx)) * 180 / Math.PI).toFixed(1);
+  var hfovEl   = document.getElementById('measure-hfov');
+  var resultEl = document.getElementById('measure-result');
+  var applyBtn = document.getElementById('measure-apply-btn');
+  if (hfovEl)   hfovEl.textContent = hfov;
+  if (resultEl) resultEl.style.display = 'block';
+  if (applyBtn) applyBtn.onclick = function() { applyFOV(hfov); };
+}
+
+// ── Probe stream ──────────────────────────────────────────────────────────
+function probeCamera() {
+  var el = document.getElementById('probe-result');
+  if (!el) return;
+  el.textContent = 'Probing RTSP stream…';
+  fetch('/api/probe-camera')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      el.textContent = '';
+      if (d.error) { el.textContent = 'Error: ' + d.error; return; }
+      if (d.model) {
+        var line = document.createElement('span');
+        line.textContent = 'Detected: ';
+        var strong = document.createElement('strong');
+        strong.textContent = d.model;
+        line.appendChild(strong);
+        el.appendChild(line);
+        if (d.hfov) {
+          var hfovInfo = document.createElement('span');
+          hfovInfo.textContent = ' — computed hfov: ';
+          var hfovStrong = document.createElement('strong');
+          hfovStrong.textContent = d.hfov + '°';
+          hfovInfo.appendChild(hfovStrong);
+          el.appendChild(hfovInfo);
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn btn--sm';
+          btn.style.marginLeft = '10px';
+          btn.textContent = 'Apply →';
+          btn.addEventListener('click', function() { applyFOV(d.hfov); });
+          el.appendChild(btn);
+        }
+      } else {
+        el.textContent = 'No camera model detected in RTSP stream metadata. Try "From camera specs" instead.';
+      }
+    })
+    .catch(function(e) { el.textContent = 'Request failed.'; });
+}
+
+// ── Monitor toggle ────────────────────────────────────────────────────────
+function toggleMonitor(action) {
+  fetch('/api/monitor-toggle', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action: action}),
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var el = document.getElementById('monitor-status-text');
+      if (!el) return;
+      if (d.active) {
+        el.textContent = '● Running';
+        el.className = 'toggle-status is-active';
+      } else {
+        el.textContent = '○ Stopped';
+        el.className = 'toggle-status is-inactive';
+      }
+    });
+}
+</script>
+</body>
+</html>
