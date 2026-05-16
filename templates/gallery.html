@@ -465,7 +465,11 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
   }
 
   function clock(d) {
-    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  }
+
+  function dayKey(d) {
+    return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
   }
 
   function rel(d, now) {
@@ -580,19 +584,26 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
   }
 
   /* ── Day group ─────────────────────────────────────────────────────────── */
-  function dayGroupHTML(dayEvents) {
-    var first = parseTime(dayEvents[0]);
-    var last  = parseTime(dayEvents[dayEvents.length - 1]);
-    var n     = dayEvents.length;
-    var meta  = n + ' event' + (n !== 1 ? 's' : '') +
-                ' · ' + clock(first) + ' ← ' + clock(last);
+  function dayGroupHTML(dayEvents, posMap, totalFiltered, fullDayN) {
+    var first  = parseTime(dayEvents[0]);
+    var last   = parseTime(dayEvents[dayEvents.length - 1]);
+    var dispN  = fullDayN !== undefined ? fullDayN : dayEvents.length;
+    var dispT  = totalFiltered !== undefined ? totalFiltered : dispN;
+    var meta   = dispN + ' event' + (dispN !== 1 ? 's' : '') +
+                 ' · ' + clock(first) + ' ← ' + clock(last);
     var items;
     if (S.layout === 'grid') {
       items = '<div class="grid-uniform">' +
-        dayEvents.map(function (ev, i) { return filmCardHTML(ev, n - i); }).join('') + '</div>';
+        dayEvents.map(function (ev, i) {
+          var seq = posMap ? (posMap[ev.event_id] || (dispN - i)) : (dispN - i);
+          return filmCardHTML(ev, seq);
+        }).join('') + '</div>';
     } else {
       items = '<ol class="rows">' +
-        dayEvents.map(function (ev, i) { return rowCardHTML(ev, n - i, n, i === 0); }).join('') + '</ol>';
+        dayEvents.map(function (ev, i) {
+          var seq = posMap ? (posMap[ev.event_id] || (dispN - i)) : (dispN - i);
+          return rowCardHTML(ev, seq, dispT, i === 0);
+        }).join('') + '</ol>';
     }
     return (
       '<section class="day">' +
@@ -724,7 +735,24 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
     var hasMore = filtered.length > S.visible;
     var groups  = groupByDay(visible);
     if (!groups.length) { $main.innerHTML = EMPTY_HTML; return; }
-    $main.innerHTML = groups.map(dayGroupHTML).join('');
+
+    // Stable seq: position within full filtered list so numbers don't shift
+    // when pagination expands. Newest event in filtered gets the highest seq.
+    var N = filtered.length;
+    var posMap = {};
+    filtered.forEach(function (ev, i) { posMap[ev.event_id] = N - i; });
+
+    // Full day counts so day headers don't shrink with pagination
+    var fullDayCounts = {};
+    filtered.forEach(function (ev) {
+      var k = dayKey(parseTime(ev));
+      fullDayCounts[k] = (fullDayCounts[k] || 0) + 1;
+    });
+
+    $main.innerHTML = groups.map(function (dayEvs) {
+      var k = dayKey(parseTime(dayEvs[0]));
+      return dayGroupHTML(dayEvs, posMap, N, fullDayCounts[k] || dayEvs.length);
+    }).join('');
 
     if (hasMore) {
       var rem    = filtered.length - S.visible;
