@@ -403,6 +403,7 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
     sources: DEFAULT_SOURCES.slice(),
     range:   'all',
     layout:  (window.innerWidth || 1024) <= 640 ? 'grid' : 'rows',
+    visible: 20,
     now:     new Date(),
     sync:    '–',
   };
@@ -718,10 +719,37 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
   );
 
   function renderEvents(filtered) {
-    var $main  = document.getElementById('js-events');
-    var groups = groupByDay(filtered);
+    var $main   = document.getElementById('js-events');
+    var visible = filtered.slice(0, S.visible);
+    var hasMore = filtered.length > S.visible;
+    var groups  = groupByDay(visible);
     if (!groups.length) { $main.innerHTML = EMPTY_HTML; return; }
     $main.innerHTML = groups.map(dayGroupHTML).join('');
+
+    if (hasMore) {
+      var rem    = filtered.length - S.visible;
+      var foot   = document.createElement('div');
+      foot.style.cssText = 'display:flex;gap:10px;justify-content:center;padding:28px 0 20px';
+
+      var btnMore = document.createElement('button');
+      btnMore.className = 'btn btn--ghost';
+      btnMore.setAttribute('data-show-more', '');
+      var moreText = document.createTextNode('Show 20 more ');
+      var hint = document.createElement('span');
+      hint.style.color = 'var(--fg-faint)';
+      hint.textContent = '(' + rem + ' remaining)';
+      btnMore.appendChild(moreText);
+      btnMore.appendChild(hint);
+
+      var btnAll = document.createElement('button');
+      btnAll.className = 'btn btn--ghost';
+      btnAll.setAttribute('data-show-all', '');
+      btnAll.textContent = 'Show all ' + filtered.length;
+
+      foot.appendChild(btnMore);
+      foot.appendChild(btnAll);
+      $main.appendChild(foot);
+    }
   }
 
   function renderAll() {
@@ -738,17 +766,20 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
     if (ft) {
       var t = ft.dataset.filterType, idx = S.types.indexOf(t);
       if (idx === -1) S.types.push(t); else S.types.splice(idx, 1);
+      S.visible = 20;
       var f = getFiltered(); renderFilters(f); renderEvents(f); return;
     }
     var fs = e.target.closest('[data-filter-source]');
     if (fs) {
       var src = fs.dataset.filterSource, sIdx = S.sources.indexOf(src);
       if (sIdx === -1) S.sources.push(src); else S.sources.splice(sIdx, 1);
+      S.visible = 20;
       var f = getFiltered(); renderFilters(f); renderEvents(f); return;
     }
     var fr = e.target.closest('[data-filter-range]');
     if (fr) {
       S.range = fr.dataset.filterRange;
+      S.visible = 20;
       var f = getFiltered(); renderFilters(f); renderEvents(f); return;
     }
     var fl = e.target.closest('[data-layout]');
@@ -759,8 +790,17 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
     if (e.target.closest('[data-clear]')) {
       S.types = []; S.range = 'all';
       S.sources = DEFAULT_SOURCES.slice();
+      S.visible = 20;
       try { localStorage.removeItem(_FILTER_KEY); } catch (e) {}
-      var f = getFiltered(); renderFilters(f); renderEvents(f);
+      var f = getFiltered(); renderFilters(f); renderEvents(f); return;
+    }
+    if (e.target.closest('[data-show-more]')) {
+      S.visible += 20;
+      var f = getFiltered(); renderEvents(f); return;
+    }
+    if (e.target.closest('[data-show-all]')) {
+      S.visible = getFiltered().length;
+      var f = getFiltered(); renderEvents(f); return;
     }
   });
 
