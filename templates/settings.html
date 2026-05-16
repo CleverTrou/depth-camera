@@ -205,6 +205,20 @@ label { color: var(--fg-mid); font-size: 12px; letter-spacing: 0.04em; text-tran
           <input type="checkbox" name="ply_ground_correction" id="gc-cb" {% if current.ply_ground_correction %}checked{% endif %}>
           <label for="gc-cb" style="text-transform:none;font-size:14px;color:var(--fg)">RANSAC ground-plane correction (flattens the floor)</label>
         </div>
+        <div class="field" style="border-top:1px solid var(--line-soft);padding-top:14px">
+          <label>Regenerate all existing point clouds</label>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <button type="button" class="btn" id="regen-btn" onclick="startRegen()">Regenerate all PLY files</button>
+            <span id="regen-status" style="font-size:12px;color:var(--fg-faint)"></span>
+          </div>
+          <div class="field-hint">Uses the <em>saved</em> Z-scale, downsample, FOV, and ground-correction values above. Save first if you've changed anything. Takes ~8 min for 200 events.</div>
+          <div id="regen-bar" style="display:none;margin-top:10px">
+            <div style="background:var(--bg-2);border-radius:4px;height:6px;overflow:hidden">
+              <div id="regen-fill" style="background:var(--accent);height:100%;width:0%;transition:width 0.5s"></div>
+            </div>
+            <div id="regen-text" style="font-size:11px;color:var(--fg-faint);margin-top:4px"></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -426,6 +440,45 @@ function probeCamera() {
       }
     })
     .catch(function(e) { el.textContent = 'Request failed.'; });
+}
+
+// ── PLY regeneration ──────────────────────────────────────────────────────
+var _regenTimer = null;
+
+function startRegen() {
+  var btn    = document.getElementById('regen-btn');
+  var status = document.getElementById('regen-status');
+  if (!confirm('Regenerate all PLY files using the currently saved settings? This takes ~8 minutes and cannot be cancelled.')) return;
+  fetch('/api/regen-ply', {method: 'POST'})
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) { status.textContent = 'Error: ' + (d.error || 'unknown'); return; }
+      btn.disabled = true;
+      document.getElementById('regen-bar').style.display = 'block';
+      status.textContent = 'Starting…';
+      _pollRegen();
+    });
+}
+
+function _pollRegen() {
+  fetch('/api/regen-status')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var fill   = document.getElementById('regen-fill');
+      var text   = document.getElementById('regen-text');
+      var status = document.getElementById('regen-status');
+      var btn    = document.getElementById('regen-btn');
+      var pct    = d.total ? Math.round(d.done / d.total * 100) : 0;
+      fill.style.width = pct + '%';
+      text.textContent = d.done + ' / ' + d.total + (d.errors ? ' (' + d.errors + ' errors)' : '');
+      if (d.running) {
+        status.textContent = pct + '%';
+        _regenTimer = setTimeout(_pollRegen, 2000);
+      } else if (d.total > 0) {
+        status.textContent = 'Done — ' + d.done + ' files regenerated' + (d.errors ? ', ' + d.errors + ' errors' : '') + '.';
+        btn.disabled = false;
+      }
+    });
 }
 
 // ── Monitor toggle ────────────────────────────────────────────────────────
