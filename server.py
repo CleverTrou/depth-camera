@@ -20,6 +20,7 @@ import math
 import os
 import re
 import subprocess
+import threading
 from functools import wraps
 from pathlib import Path
 
@@ -72,6 +73,41 @@ log = logging.getLogger("gallery")
 app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
 _config = {}
 _config_path: Path | None = None   # set in main(); used by settings page
+
+# PLY regeneration state (written by background thread, read by status API)
+_regen_lock = threading.Lock()
+_regen_state: dict = {"running": False, "done": 0, "total": 0, "errors": 0}
+
+
+def _regen_worker(data_dir: str, hfov: float, depth_scale: float,
+                  downsample: int, ground_correction: bool) -> None:
+    import numpy as np
+    from PIL import Image as _PIL
+    from outputs import generate_pointcloud
+
+    events_dir = Path(data_dir) / "events"
+    dirs = [d for d in sorted(events_dir.iterdir()) if d.is_dir()]
+
+    with _regen_lock:
+        _regen_state.update(running=True, done=0, total=len(dirs), errors=0)
+
+    for event_dir in dirs:
+        depth_f = event_dir / "depth.npy"
+        snap_f  = event_dir / "snapshot.jpg"
+        if depth_f.exists() and snap_f.exists():
+            try:
+                depth = np.load(str(depth_f))
+                rgb   = np.array(_PIL.open(str(snap_f)).convert("RGB"))
+                generate_pointcloud(rgb, depth, event_dir / "pointcloud.ply",
+                                    downsample, depth_scale, hfov, ground_correction)
+            except Exception:
+                with _regen_lock:
+                    _regen_state["errors"] += 1
+        with _regen_lock:
+            _regen_state["done"] += 1
+
+    with _regen_lock:
+        _regen_state["running"] = False
 
 # Known cameras with diagonal FOV — used to pre-fill hfov_deg from spec
 CAMERA_DB = {
@@ -505,6 +541,38 @@ def api_monitor_toggle():
         return jsonify({"ok": True, "active": _service_active("depth-monitor")})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)})
+
+
+@app.route("/api/regen-ply", methods=["POST"])
+@_require_pin
+def api_regen_ply():
+    """Start background PLY regeneration using current saved settings."""
+    with _regen_lock:
+        if _regen_state["running"]:
+            return jsonify({"ok": False, "error": "Already running"}), 409
+
+    raw   = _read_deployed_config()
+    pipe  = raw.get("pipeline", {})
+    t = threading.Thread(
+        target=_regen_worker,
+        args=(
+            _config.get("pipeline", {}).get("data_dir", "/data/depth-camera"),
+            pipe.get("camera_hfov_deg",     113.0),
+            pipe.get("ply_depth_scale",     1.5),
+            pipe.get("ply_downsample",      2),
+            pipe.get("ply_ground_correction", True),
+        ),
+        daemon=True,
+    )
+    t.start()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/regen-status")
+@_require_pin
+def api_regen_status():
+    with _regen_lock:
+        return jsonify(_regen_state.copy())
 
 
 @app.route("/api/compute-hfov")
