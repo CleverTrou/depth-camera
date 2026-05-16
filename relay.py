@@ -173,7 +173,7 @@ def _capture_and_process(source, event_type, lookback_override=None):
         depth_input_size=pipe["depth_input_size"],
         colormap=pipe["colormap"],
         camera_hfov_deg=pipe.get("camera_hfov_deg", 113.0),
-        ply_depth_scale=pipe.get("ply_depth_scale", 2.5),
+        ply_depth_scale=pipe["ply_depth_scale"],
         ply_ground_correction=pipe.get("ply_ground_correction", True),
         ntfy_topic_url=ntfy_url,
     )
