@@ -744,8 +744,9 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
 
     // Full day counts so day headers don't shrink with pagination
     var fullDayCounts = {};
-    groupByDay(filtered).forEach(function (dayEvs) {
-      fullDayCounts[dayKey(parseTime(dayEvs[0]))] = dayEvs.length;
+    filtered.forEach(function (ev) {
+      var k = dayKey(parseTime(ev));
+      fullDayCounts[k] = (fullDayCounts[k] || 0) + 1;
     });
 
     $main.innerHTML = groups.map(function (dayEvs) {
