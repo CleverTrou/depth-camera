@@ -35,7 +35,10 @@ detection:
   compare_width: 320
   compare_height: 240
   threshold: 20
-  min_changed_pct: 20.0      # was 5.0; baselines show p50 30-76%, 5% caught everything
+  # Higher per-pixel threshold used only for the orange diff image visualization,
+  # not for detection counting. Reduces visual noise; 0 = same as threshold.
+  diff_display_threshold: 40
+  min_changed_pct: 20.0      # was 5.0 pre-EWMA; EWMA p50 is now 1-4%, tune accordingly
   min_mean_diff: 12.0        # absolute pixel-intensity gate; filters lighting flicker
   cooldown: 300              # was 120; hard ceiling ~12 triggers/hour
   confirm_frames: 3          # was 2; require 9s sustained motion instead of 6s
