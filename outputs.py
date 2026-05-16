@@ -197,10 +197,20 @@ def generate_pointcloud(
     d = d[mask]
     colors = colors[mask]
 
-    # Convert to 3D: Z increases away from camera
-    z = (1.0 - d) * depth_scale
-    x = (xx - cx) * z / fx
-    y = (yy - cy) * z / fy
+    # Convert to 3D with perspective depth correction.
+    # The depth model predicts along-ray distance; we need orthogonal z-depth.
+    # For a pixel at angle θ from the optical axis: z_ortho = z_ray * cos(θ).
+    # Without this, wide-angle edge pixels appear ~45% too deep, creating the
+    # characteristic bowl/U distortion on flat surfaces like a patio floor.
+    z_ray = 1.0 - d
+    nx = (xx - cx) / fx  # normalised ray direction (= tan θ_x)
+    ny = (yy - cy) / fy  # normalised ray direction (= tan θ_y)
+    cos_theta = 1.0 / np.sqrt(1.0 + nx ** 2 + ny ** 2)
+    z_ortho = z_ray * cos_theta  # orthogonal depth
+
+    x = nx * z_ortho
+    y = ny * z_ortho
+    z = z_ortho * depth_scale
 
     # RANSAC ground-plane correction: fit a plane to the lower 40% of the
     # frame, then rotate the whole cloud so that plane is horizontal.
@@ -211,7 +221,10 @@ def generate_pointcloud(
             R = _rotation_align(normal)
             pts = np.stack([x, y, z], axis=1) @ R.T
             x, y, z = pts[:, 0], pts[:, 1], pts[:, 2]
-            log.info("Ground plane corrected via RANSAC")
+            log.info(
+                f"Ground plane corrected via RANSAC "
+                f"(normal=[{normal[0]:.3f}, {normal[1]:.3f}, {normal[2]:.3f}])"
+            )
         else:
             log.info("RANSAC ground correction skipped (no dominant plane found)")
 

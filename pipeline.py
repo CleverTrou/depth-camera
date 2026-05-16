@@ -67,6 +67,7 @@ def process_event(
     depth_input_size: int = 518,
     colormap: str = "inferno",
     camera_hfov_deg: float = 113.0,
+    ply_depth_scale: float = 1.5,
     ply_ground_correction: bool = True,
     ntfy_topic_url: str | None = None,
     extra_metadata: dict | None = None,
@@ -134,7 +135,8 @@ def process_event(
         generate_depth_image(depth_map, event_dir / "depth_map.png")
         generate_pointcloud(
             rgb, depth_map, event_dir / "pointcloud.ply",
-            ply_downsample, hfov_deg=camera_hfov_deg,
+            ply_downsample, depth_scale=ply_depth_scale,
+            hfov_deg=camera_hfov_deg,
             ground_correction=ply_ground_correction,
         )
 
@@ -150,6 +152,7 @@ def process_event(
             "elapsed_s": round(elapsed, 1),
             "depth_input_size": depth_input_size,
             "ply_downsample": ply_downsample,
+            "ply_depth_scale": ply_depth_scale,
             "image_size": list(pil_image.size),
         }
         if extra_metadata:

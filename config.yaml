@@ -56,6 +56,11 @@ pipeline:
   # Depth visualization colormap: inferno, viridis, magma, turbo
   colormap: "inferno"
 
+  # Z-axis scale for the point cloud. With the correct wide-angle FOV the scene
+  # is geometrically 3x wider than deep; increase this to stretch the depth axis
+  # and restore natural-looking front-to-back proportions. Try 2.5–4.0.
+  ply_depth_scale: 1.5
+
   # Camera horizontal field of view (degrees) for point cloud projection.
   # Aqara G5 Pro: ~113° derived from 120° diagonal spec over a 16:9 sensor.
   # Incorrect FOV causes ground-plane bowing. Tune until the ground looks flat.
