@@ -16,8 +16,10 @@ import argparse
 import hashlib
 import json
 import logging
+import math
 import os
 import re
+import subprocess
 from functools import wraps
 from pathlib import Path
 
@@ -69,6 +71,30 @@ log = logging.getLogger("gallery")
 
 app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
 _config = {}
+_config_path: Path | None = None   # set in main(); used by settings page
+
+# Known cameras with diagonal FOV — used to pre-fill hfov_deg from spec
+CAMERA_DB = {
+    "Aqara G5 Pro":      {"diag_fov": 120, "note": "4MP wide-angle"},
+    "Aqara G2H Pro":     {"diag_fov": 140, "note": "2MP ultra-wide"},
+    "Aqara G2H":         {"diag_fov": 140, "note": "2MP ultra-wide"},
+    "Aqara E1":          {"diag_fov": 115, "note": "outdoor 2MP"},
+    "Reolink 410W":      {"diag_fov": 100, "note": "4K outdoor"},
+    "Reolink 520A":      {"diag_fov": 100, "note": "5MP PoE"},
+    "Reolink Duo 2 WiFi": {"diag_fov": 105, "note": "dual-lens 4K"},
+    "Wyze Cam v3":       {"diag_fov": 130, "note": "indoor/outdoor"},
+    "Wyze Cam Outdoor":  {"diag_fov": 110, "note": "outdoor"},
+    "Amcrest IP8M-2493EW": {"diag_fov": 98, "note": "4K outdoor"},
+    "Hikvision DS-2CD2143G2": {"diag_fov": 100, "note": "4MP dome"},
+    "Dahua IPC-HDW2849H": {"diag_fov": 98, "note": "8MP eyeball"},
+}
+
+
+def _diag_to_hfov(diag_fov_deg: float, width: int = 2688, height: int = 1520) -> float:
+    """Convert diagonal FOV (degrees) to horizontal FOV for a given resolution."""
+    d = math.sqrt(width ** 2 + height ** 2)
+    fx = d / (2 * math.tan(math.radians(diag_fov_deg / 2)))
+    return round(math.degrees(2 * math.atan(width / (2 * fx))), 1)
 
 # Event IDs are always generated as YYYYMMDD_HHMMSS_xxxxxxxx (6 hex chars).
 # Validate before using as a filesystem path component.
@@ -306,6 +332,194 @@ def api_status():
 
 
 # ---------------------------------------------------------------------------
+# Settings
+# ---------------------------------------------------------------------------
+
+def _read_deployed_config() -> dict:
+    """Read the config file the server was started with."""
+    if _config_path and _config_path.exists():
+        with open(_config_path) as f:
+            return yaml.safe_load(f) or {}
+    return {}
+
+
+def _write_deployed_config(raw: dict) -> str | None:
+    """Write config; returns an error string on failure, None on success."""
+    if not _config_path:
+        return "No config file path — start the server with --config."
+    try:
+        with open(_config_path, "w") as f:
+            yaml.dump(raw, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        return None
+    except OSError as e:
+        return f"Could not write config: {e}"
+
+
+def _restart_service(name: str) -> bool:
+    try:
+        subprocess.run(["sudo", "systemctl", "restart", name],
+                       check=True, timeout=15, capture_output=True)
+        return True
+    except Exception:
+        return False
+
+
+def _service_active(name: str) -> bool:
+    r = subprocess.run(["systemctl", "is-active", "--quiet", name],
+                       timeout=5, capture_output=True)
+    return r.returncode == 0
+
+
+@app.route("/settings", methods=["GET", "POST"])
+@_require_pin
+def settings_page():
+    saved = []
+    errors = []
+
+    if request.method == "POST":
+        raw = _read_deployed_config()
+
+        def _set(section, key, cast, form_key):
+            try:
+                raw.setdefault(section, {})[key] = cast(request.form[form_key])
+            except (KeyError, ValueError) as e:
+                errors.append(f"{form_key}: {e}")
+
+        _set("relay",     "lookback_s",         float, "relay_lookback_s")
+        _set("pipeline",  "camera_hfov_deg",     float, "camera_hfov_deg")
+        _set("pipeline",  "ply_depth_scale",     float, "ply_depth_scale")
+        _set("pipeline",  "ply_downsample",      int,   "ply_downsample")
+        raw.setdefault("pipeline", {})["ply_ground_correction"] = \
+            "ply_ground_correction" in request.form
+
+        _set("detection", "lookback_s",          float, "monitor_lookback_s")
+        _set("detection", "min_changed_pct",     float, "monitor_min_changed_pct")
+        _set("detection", "confirm_frames",      int,   "monitor_confirm_frames")
+        _set("detection", "cooldown",            int,   "monitor_cooldown")
+        _set("detection", "diff_display_threshold", int, "monitor_diff_display_threshold")
+
+        new_pin = request.form.get("gallery_pin", "").strip()
+        raw.setdefault("gallery", {})["pin"] = new_pin
+
+        if not errors:
+            write_err = _write_deployed_config(raw)
+            if write_err:
+                errors.append(write_err)
+            else:
+                relay_ok   = _restart_service("depth-relay")
+                monitor_ok = _restart_service("depth-monitor")
+                saved = ["Settings saved."]
+                if not relay_ok:   saved.append("Warning: could not restart depth-relay.")
+                if not monitor_ok: saved.append("Warning: could not restart depth-monitor.")
+                saved.append("Gallery PIN/config changes take effect after the next manual gallery restart.")
+
+    raw = _read_deployed_config()
+    current = {
+        "relay_lookback_s":              raw.get("relay", {}).get("lookback_s", 5),
+        "camera_hfov_deg":               raw.get("pipeline", {}).get("camera_hfov_deg", 113.0),
+        "ply_depth_scale":               raw.get("pipeline", {}).get("ply_depth_scale", 1.5),
+        "ply_downsample":                raw.get("pipeline", {}).get("ply_downsample", 2),
+        "ply_ground_correction":         raw.get("pipeline", {}).get("ply_ground_correction", True),
+        "monitor_lookback_s":            raw.get("detection", {}).get("lookback_s", 2),
+        "monitor_min_changed_pct":       raw.get("detection", {}).get("min_changed_pct", 20.0),
+        "monitor_confirm_frames":        raw.get("detection", {}).get("confirm_frames", 3),
+        "monitor_cooldown":              raw.get("detection", {}).get("cooldown", 300),
+        "monitor_diff_display_threshold": raw.get("detection", {}).get("diff_display_threshold", 40),
+        "gallery_pin":                   raw.get("gallery", {}).get("pin", ""),
+        "monitor_active":                _service_active("depth-monitor"),
+    }
+    # Most recent snapshot + image dimensions for the FOV two-point tool
+    recent_snap = None
+    snap_width, snap_height = 2688, 1520  # Aqara G5 Pro defaults
+    events_dir = _events_dir()
+    if events_dir.exists():
+        try:
+            dirs = sorted(events_dir.iterdir(), key=lambda p: p.name, reverse=True)
+            for d in dirs:
+                if (d / "snapshot.jpg").exists():
+                    recent_snap = d.name
+                    meta_f = d / "metadata.json"
+                    if meta_f.exists():
+                        try:
+                            meta = json.loads(meta_f.read_text())
+                            if isinstance(meta, dict) and meta.get("image_size"):
+                                snap_width, snap_height = meta["image_size"]
+                        except (json.JSONDecodeError, OSError, TypeError, ValueError):
+                            pass
+                    break
+        except OSError:
+            pass
+
+    return render_template("settings.html",
+                           current=current,
+                           camera_db=CAMERA_DB,
+                           recent_snap=recent_snap,
+                           snap_width=snap_width,
+                           snap_height=snap_height,
+                           saved=saved,
+                           errors=errors)
+
+
+@app.route("/api/probe-camera")
+@_require_pin
+def api_probe_camera():
+    """Try to extract camera model from the RTSP stream metadata via ffprobe."""
+    rtsp_url = _config.get("camera", {}).get("rtsp_url", "")
+    if not rtsp_url or "USER" in rtsp_url:
+        return jsonify({"model": None, "hfov": None, "raw": {}})
+
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-print_format", "json",
+             "-show_format", "-rtsp_transport", "tcp", "-i", rtsp_url],
+            capture_output=True, text=True, timeout=12,
+        )
+        data = json.loads(r.stdout or "{}")
+        tags = data.get("format", {}).get("tags", {})
+        model = (tags.get("model") or tags.get("encoder") or
+                 tags.get("manufacturer") or None)
+        # Try fuzzy match against CAMERA_DB
+        hfov = None
+        if model:
+            for cam, info in CAMERA_DB.items():
+                if cam.lower() in model.lower() or model.lower() in cam.lower():
+                    w = data.get("streams", [{}])[0].get("width", 2688) if data.get("streams") else 2688
+                    h = data.get("streams", [{}])[0].get("height", 1520) if data.get("streams") else 1520
+                    hfov = _diag_to_hfov(info["diag_fov"], w, h)
+                    break
+        return jsonify({"model": model, "hfov": hfov, "tags": tags})
+    except Exception as e:
+        return jsonify({"model": None, "hfov": None, "error": str(e)})
+
+
+@app.route("/api/monitor-toggle", methods=["POST"])
+@_require_pin
+def api_monitor_toggle():
+    """Enable or disable the depth-monitor service."""
+    action = request.json.get("action") if request.is_json else None
+    if action not in ("start", "stop"):
+        return jsonify({"ok": False, "error": "action must be start or stop"}), 400
+    cmd = ["sudo", "systemctl", action, "depth-monitor"]
+    try:
+        subprocess.run(cmd, check=True, timeout=10, capture_output=True)
+        return jsonify({"ok": True, "active": _service_active("depth-monitor")})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})
+
+
+@app.route("/api/compute-hfov")
+def api_compute_hfov():
+    """Compute horizontal FOV from diagonal FOV and image dimensions."""
+    try:
+        diag = float(request.args["diag_fov"])
+        w    = int(request.args.get("width",  2688))
+        h    = int(request.args.get("height", 1520))
+        return jsonify({"hfov": _diag_to_hfov(diag, w, h)})
+    except (KeyError, ValueError) as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------
 
@@ -315,7 +529,9 @@ def main():
     parser.add_argument("--config", "-c", help="Path to YAML config file")
     args = parser.parse_args()
 
+    global _config_path
     _config = load_config(args.config)
+    _config_path = Path(args.config) if args.config else None
 
     gallery_cfg = _config["gallery"]
     data_dir = _config["pipeline"]["data_dir"]
