@@ -47,6 +47,7 @@ DEFAULT_CONFIG = {
         "compare_width": 320,
         "compare_height": 240,
         "threshold": 20,
+        "diff_display_threshold": 40,
         "min_changed_pct": 5.0,
         # 30s was producing ~90 triggers/hour on a windy day (sustained motion
         # saturates the cooldown). 120s caps it at ~30/hour while we tune the
@@ -153,8 +154,14 @@ def save_motion_diff(
     height: int,
     threshold: int,
     event_dir: Path,
+    display_threshold: int = 0,
 ) -> None:
-    """Save a motion diff JPEG: dimmed current frame with motion pixels highlighted orange."""
+    """Save a motion diff JPEG: dimmed current frame with motion pixels highlighted orange.
+
+    display_threshold overrides threshold for the orange mask only, letting
+    the visualisation highlight only the strongest changes without affecting
+    detection sensitivity. Defaults to threshold when not set.
+    """
     try:
         from PIL import Image
 
@@ -162,12 +169,14 @@ def save_motion_diff(
         if background_lum is None or len(current) < expected:
             return
 
+        vis_threshold = display_threshold if display_threshold > 0 else threshold
+
         cur = np.frombuffer(current[:expected], dtype=np.uint8).reshape(height, width, 3).astype(float)
         cur_lum = cur.mean(axis=2)
         bg_lum = background_lum.reshape(height, width)
 
         diffs = cur_lum - bg_lum
-        motion_mask = np.abs(diffs - float(diffs.mean())) > threshold
+        motion_mask = np.abs(diffs - float(diffs.mean())) > vis_threshold
 
         vis = cur * 0.45
         vis[motion_mask, 0] = 255
@@ -359,6 +368,7 @@ def main():
                             pre_update_bg, current,
                             det["compare_width"], det["compare_height"],
                             det["threshold"], event_dir,
+                            display_threshold=det.get("diff_display_threshold", 0),
                         )
 
                 last_trigger = now
