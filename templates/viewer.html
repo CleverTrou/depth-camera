@@ -260,7 +260,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
         <div class="vhdr__id mono">{{ event_id }}</div>
         <div class="vhdr__meta">
           {% if event.event_type %}<span class="chip" data-type="{{ event.event_type }}">{{ event.event_type }}</span>{% endif %}
-          {% if event.timestamp %}<span class="vhdr__time">{{ event.timestamp[:16].replace('T', ' ') }}</span>{% endif %}
+          {% if event.timestamp %}<span class="vhdr__time">{{ event.timestamp[:19].replace('T', ' ') }}</span>{% endif %}
           {% if event.source %}<span class="vhdr__src">via {{ event.source }}</span>{% endif %}
         </div>
       </div>
