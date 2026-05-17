@@ -393,8 +393,10 @@ def _write_deployed_config(raw: dict) -> str | None:
 
 def _restart_service(name: str) -> bool:
     try:
-        subprocess.run(["sudo", "systemctl", "restart", name],
-                       check=True, timeout=15, capture_output=True)
+        # --no-block: fire the restart and return immediately so the HTTP
+        # response isn't held open for 10-30 s while services come up.
+        subprocess.run(["sudo", "systemctl", "restart", "--no-block", name],
+                       check=True, timeout=5, capture_output=True)
         return True
     except Exception:
         return False

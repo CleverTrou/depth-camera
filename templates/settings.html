@@ -281,9 +281,9 @@ label { color: var(--fg-mid); font-size: 12px; letter-spacing: 0.04em; text-tran
     </div>
 
     <div class="save-bar">
-      <button type="submit" class="btn btn--primary">Save &amp; restart services</button>
-      <a href="/" class="btn">Cancel</a>
-      <span style="color:var(--fg-faint);font-size:12px">Restarts depth-relay &amp; depth-monitor with new settings.</span>
+      <button type="submit" class="btn btn--primary" id="save-btn">Save &amp; restart services</button>
+      <a href="/" class="btn" id="cancel-btn">Cancel</a>
+      <span style="color:var(--fg-faint);font-size:12px" id="save-hint">Restarts depth-relay &amp; depth-monitor with new settings.</span>
     </div>
 
   </form>
@@ -291,6 +291,17 @@ label { color: var(--fg-mid); font-size: 12px; letter-spacing: 0.04em; text-tran
 
 <script>
 'use strict';
+
+// ── Save button feedback ──────────────────────────────────────────────────
+document.querySelector('form').addEventListener('submit', function() {
+  var btn  = document.getElementById('save-btn');
+  var hint = document.getElementById('save-hint');
+  var cxl  = document.getElementById('cancel-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  if (hint) hint.textContent = 'Writing config and restarting services — this takes a few seconds.';
+  if (cxl) { cxl.style.pointerEvents = 'none'; cxl.style.opacity = '0.4'; cxl.tabIndex = -1; }
+});
 
 // ── FOV tabs ──────────────────────────────────────────────────────────────
 document.querySelectorAll('.fov-tab').forEach(function(btn) {
