@@ -1077,10 +1077,9 @@ async function mountXr() {
   const headset = /OculusBrowser|Quest|Pico|VisionOS|Wolvic/i.test(ua) || vrOk || arOk;
   // WebXR requires HTTPS — detect headset on plain HTTP so we can explain why VR is disabled
   const httpsNeeded = headset && !vrOk && !arOk && isHttp;
-  // Safe display of current host+path for the HTTPS hint (hostname chars can't contain HTML specials,
-  // but encode anyway to satisfy linters and future-proof)
-  const safeHost = location.host.replace(/&/g,'&amp;').replace(/</g,'&lt;');
-  const safePath = location.pathname.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  // Safe display of current URL for the HTTPS hint — include search so ?headset=1 is preserved
+  const safeUrl = (location.host + location.pathname + location.search)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   // Simple seeded QR-like grid (same approach as design reference)
   function fauxQR(data, size) {
@@ -1126,7 +1125,7 @@ async function mountXr() {
                 ? 'Step into the scene &mdash; the depth map becomes a real volumetric proxy you can walk around.'
                 : 'Open this URL on a Quest, Vision Pro, or Pico headset to enter the scene in immersive 3D.'}
           </div>
-          ${httpsNeeded ? `<div class="xr__sub mono" style="font-size:11px;margin-top:-8px;margin-bottom:18px;background:var(--accent-bg);border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px;color:var(--fg-mid)">Try: <b style="color:var(--accent)">https://</b>${safeHost}${safePath}</div>` : ''}
+          ${httpsNeeded ? `<div class="xr__sub mono" style="font-size:11px;margin-top:-8px;margin-bottom:18px;background:var(--accent-bg);border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px;color:var(--fg-mid)">Try: <b style="color:var(--accent)">https://</b>${safeUrl}</div>` : ''}
           <div class="xr__btns">
             <button class="btn btn--primary" id="js-xr-vr" ${!vrOk ? 'disabled' : ''}>
               ${vrOk ? 'Enter VR' : httpsNeeded ? 'VR requires HTTPS' : 'VR not available'}
