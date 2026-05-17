@@ -300,7 +300,7 @@ document.querySelector('form').addEventListener('submit', function() {
   btn.disabled = true;
   btn.textContent = 'Saving…';
   if (hint) hint.textContent = 'Writing config and restarting services — this takes a few seconds.';
-  if (cxl)  cxl.style.pointerEvents = 'none';
+  if (cxl) { cxl.style.pointerEvents = 'none'; cxl.style.opacity = '0.4'; cxl.tabIndex = -1; }
 });
 
 // ── FOV tabs ──────────────────────────────────────────────────────────────
