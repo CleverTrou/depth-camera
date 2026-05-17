@@ -34,6 +34,26 @@
 [data-aesthetic="instrument"] { --font-display: var(--font-mono); --radius: 4px; }
 [data-aesthetic="cinematic"]  { --font-display: "Fraunces", Georgia, serif; --radius: 16px; }
 [data-aesthetic="brutalist"]  { --font-display: "Inter Tight", system-ui, sans-serif; --radius: 0px; --line: oklch(0.96 0.005 250); }
+
+/* ── GLASS — Minority Report / translucent layered interface ─────────────── */
+[data-aesthetic="glass"] {
+  --accent-h: 198; --accent-c: 0.17; --accent-l: 0.85;
+  --accent-2: oklch(0.85 0.17 75);
+  --font-display: var(--font-mono);
+  --radius: 2px;
+  --bg:        #03070e;
+  --bg-1:      rgba(120, 180, 220, 0.05);
+  --bg-2:      rgba(120, 180, 220, 0.09);
+  --line:      rgba(150, 220, 255, 0.22);
+  --line-soft: rgba(150, 220, 255, 0.10);
+  --fg:        oklch(0.97 0.02 198);
+  --fg-mid:    oklch(0.80 0.05 198);
+  --fg-dim:    oklch(0.62 0.06 198);
+  --fg-faint:  oklch(0.45 0.04 198);
+  --accent-bg: rgba(140, 215, 255, 0.16);
+  --glow-text: 0 0 12px rgba(140, 215, 255, 0.45);
+  color-scheme: dark;
+}
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
   background: var(--bg); color: var(--fg);
@@ -237,6 +257,205 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   .dock__actions { margin-left: 0; }
   .vhdr__id { font-size: 11px; }
 }
+
+/* ── GLASS-aesthetic overrides for the viewer ─────────────────────────────── */
+[data-aesthetic="glass"] html,
+[data-aesthetic="glass"] body {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0, 110, 170, 0.22), transparent 65%),
+    radial-gradient(ellipse 100% 80% at 50% 120%, rgba(8, 18, 50, 0.55), transparent 60%),
+    linear-gradient(180deg, #050c18 0%, #02050b 100%);
+  background-attachment: fixed;
+}
+[data-aesthetic="glass"] .viewer { background: transparent; }
+[data-aesthetic="glass"] body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(0deg,
+    transparent 0 2px, rgba(140, 220, 255, 0.012) 3px 4px);
+  mix-blend-mode: screen;
+}
+
+/* Header */
+[data-aesthetic="glass"] .vhdr {
+  background: rgba(6, 18, 36, 0.55);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+          backdrop-filter: blur(20px) saturate(140%);
+  border-bottom: 1px solid rgba(140, 215, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 12px 28px -16px rgba(0, 30, 60, 0.4);
+}
+[data-aesthetic="glass"] .vhdr__back {
+  background: rgba(140, 215, 255, 0.06);
+  border-color: rgba(140, 215, 255, 0.28);
+  color: var(--accent);
+}
+[data-aesthetic="glass"] .vhdr__back:hover {
+  background: rgba(140, 215, 255, 0.12);
+  box-shadow: 0 0 16px -4px rgba(140, 215, 255, 0.55);
+}
+[data-aesthetic="glass"] .vhdr__id { text-shadow: var(--glow-text); }
+
+/* Stage */
+[data-aesthetic="glass"] .viewer__stage {
+  background:
+    radial-gradient(ellipse 100% 80% at 50% 50%, rgba(0, 60, 100, 0.15), transparent 70%),
+    #02060d;
+}
+
+/* Stage corner labels */
+[data-aesthetic="glass"] .stage-corner {
+  background: rgba(8, 22, 42, 0.65);
+  -webkit-backdrop-filter: blur(12px);
+          backdrop-filter: blur(12px);
+  border: 1px solid rgba(140, 215, 255, 0.28);
+  color: var(--accent);
+  text-shadow: 0 0 6px rgba(140, 215, 255, 0.45);
+  box-shadow: 0 0 16px -4px rgba(0, 50, 100, 0.5);
+}
+
+/* Chips */
+[data-aesthetic="glass"] .chip {
+  background: rgba(140, 215, 255, 0.05);
+  border-color: rgba(140, 215, 255, 0.24);
+  color: oklch(0.85 0.05 198);
+}
+
+/* Buttons */
+[data-aesthetic="glass"] .btn {
+  background: rgba(140, 215, 255, 0.05);
+  border-color: rgba(140, 215, 255, 0.22);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+[data-aesthetic="glass"] .btn:hover { color: var(--accent); border-color: var(--accent); box-shadow: 0 0 16px -4px rgba(140, 215, 255, 0.5); }
+[data-aesthetic="glass"] .btn--primary {
+  background: linear-gradient(180deg, oklch(0.92 0.16 198), oklch(0.74 0.18 215));
+  border-color: rgba(190, 235, 255, 0.6);
+  color: #021018;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 0 1px rgba(190, 235, 255, 0.3),
+    0 0 24px -4px rgba(140, 215, 255, 0.65);
+}
+
+/* Dock */
+[data-aesthetic="glass"] .dock {
+  background: rgba(6, 18, 36, 0.6);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+          backdrop-filter: blur(20px) saturate(140%);
+  border-top: 1px solid rgba(140, 215, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 -12px 28px -16px rgba(0, 30, 60, 0.4);
+  position: relative;
+}
+[data-aesthetic="glass"] .dock::before,
+[data-aesthetic="glass"] .dock::after {
+  content: ""; position: absolute; width: 12px; height: 12px;
+  border-color: var(--accent); opacity: 0.55; pointer-events: none;
+}
+[data-aesthetic="glass"] .dock::before { top: -1px; left: 10px; border-top: 1px solid; border-left: 1px solid; }
+[data-aesthetic="glass"] .dock::after  { top: -1px; right: 10px; border-top: 1px solid; border-right: 1px solid; }
+
+[data-aesthetic="glass"] .dock__pills {
+  background: rgba(140, 215, 255, 0.04);
+  border-color: rgba(140, 215, 255, 0.18);
+}
+[data-aesthetic="glass"] .dock__pill { color: var(--fg-mid); transition: background 160ms, color 160ms, box-shadow 160ms; }
+[data-aesthetic="glass"] .dock__pill:hover { color: var(--fg); background: rgba(140, 215, 255, 0.06); }
+[data-aesthetic="glass"] .dock__pill--on {
+  background: rgba(140, 215, 255, 0.18);
+  color: var(--accent);
+  box-shadow:
+    inset 0 0 0 1px rgba(140, 215, 255, 0.4),
+    0 0 18px -4px rgba(140, 215, 255, 0.6);
+  text-shadow: 0 0 8px rgba(140, 215, 255, 0.55);
+}
+
+/* Depth slider — knob + bar tinted */
+[data-aesthetic="glass"] .dslider {
+  background: #02060d;
+}
+[data-aesthetic="glass"] .dslider__bar {
+  background: var(--accent);
+  box-shadow: 0 0 16px var(--accent), 0 0 32px rgba(140, 215, 255, 0.45);
+}
+[data-aesthetic="glass"] .dslider__knob {
+  background: rgba(6, 18, 36, 0.78);
+  -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow:
+    inset 0 0 0 1px rgba(140, 215, 255, 0.2),
+    0 0 28px -4px rgba(140, 215, 255, 0.7),
+    0 0 0 4px rgba(0, 0, 0, 0.25);
+}
+[data-aesthetic="glass"] .dslider__tag {
+  background: rgba(8, 22, 42, 0.7);
+  border-color: rgba(140, 215, 255, 0.32);
+  color: var(--accent);
+  text-shadow: 0 0 6px rgba(140, 215, 255, 0.45);
+}
+
+/* XR landing */
+[data-aesthetic="glass"] .xr__title { letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; text-shadow: 0 0 18px rgba(140, 215, 255, 0.45); }
+[data-aesthetic="glass"] .xr__glyph { filter: drop-shadow(0 0 14px rgba(140, 215, 255, 0.55)); }
+[data-aesthetic="glass"] .xr__qrbox {
+  background: rgba(8, 22, 42, 0.55);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  border: 1px solid rgba(140, 215, 255, 0.28);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 0 24px -8px rgba(140, 215, 255, 0.4);
+  color: var(--accent);
+}
+[data-aesthetic="glass"] .xr__support { border-top-color: rgba(140, 215, 255, 0.14); }
+
+/* Auto-XR nudge */
+[data-aesthetic="glass"] .dock__auto {
+  background: rgba(6, 18, 36, 0.85);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px rgba(140, 215, 255, 0.3),
+    0 0 32px -6px rgba(140, 215, 255, 0.55),
+    0 12px 30px rgba(0, 30, 60, 0.5);
+  color: var(--fg);
+}
+
+/* HUD */
+[data-aesthetic="glass"] .hud { color: rgba(140, 220, 255, 0.55); text-shadow: 0 0 4px rgba(140, 215, 255, 0.3); }
+
+/* Stage messages (loading / errors) */
+[data-aesthetic="glass"] .stage-msg { color: var(--accent); text-shadow: var(--glow-text); }
+
+/* Headset passthrough */
+[data-aesthetic="glass"][data-headset="1"] html,
+[data-aesthetic="glass"][data-headset="1"] body { background: transparent !important; }
+[data-aesthetic="glass"][data-headset="1"] body::after { display: none; }
+[data-aesthetic="glass"][data-headset="1"] .viewer { background: transparent; }
+[data-aesthetic="glass"][data-headset="1"] .viewer__stage { background: transparent !important; }
+[data-aesthetic="glass"][data-headset="1"] .vhdr { background: rgba(6, 18, 36, 0.55); }
+[data-aesthetic="glass"][data-headset="1"] .dock { background: rgba(6, 18, 36, 0.55); }
+[data-aesthetic="glass"][data-headset="1"] .dslider { background: transparent !important; }
+
+/* UI Mode select (compact version for dock) */
+.ui-mode__sel {
+  appearance: none; -webkit-appearance: none;
+  font: inherit; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 6px 22px 6px 10px; line-height: 1;
+  background: var(--bg-1) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'><path fill='%2389a' d='M0 0h8L4 6z'/></svg>") no-repeat right 8px center;
+  color: var(--fg-mid); border: 1px solid var(--line); border-radius: var(--radius);
+  cursor: pointer; transition: border-color 120ms, color 120ms;
+}
+.ui-mode__sel:hover, .ui-mode__sel:focus { color: var(--fg); border-color: var(--accent); outline: none; }
+[data-aesthetic="glass"] .ui-mode__sel {
+  background-color: rgba(140, 215, 255, 0.06);
+  border-color: rgba(140, 215, 255, 0.28);
+  color: var(--accent);
+}
+[data-aesthetic="glass"] .ui-mode__sel:hover { box-shadow: 0 0 14px -3px rgba(140, 215, 255, 0.5); }
 </style>
 
 <!-- Three.js importmap — loaded lazily only when Cloud mode is activated -->
@@ -301,6 +520,13 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     <div class="dock__actions">
       <a href="/" class="btn btn--ghost">&#x2039; Gallery</a>
       {% if event.has_ply %}<a href="/events/{{ event_id }}/pointcloud.ply" class="btn" download="{{ event_id }}.ply">PLY</a>{% endif %}
+      <select id="js-ui-mode" class="ui-mode__sel" title="UI mode">
+        <option value="glass">Glass</option>
+        <option value="instrument">Instrument</option>
+        <option value="cinematic">Cinematic</option>
+        <option value="brutalist">Brutalist</option>
+        <option value="soft">Soft</option>
+      </select>
     </div>
     <!-- XR auto-detect banner inserted by JS -->
   </div>
@@ -309,6 +535,30 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 <script>
 window.VIEWER_EVENT = {{ event | tojson }};
+</script>
+<script>
+/* ── Apply persisted UI mode + headset detection ─────────────────────────── */
+(function () {
+  var _UI_KEY = 'depth-ui-mode';
+  try {
+    var _saved = localStorage.getItem(_UI_KEY);
+    if (_saved) document.body.dataset.aesthetic = _saved;
+  } catch (e) {}
+  if (/OculusBrowser|Quest|Pico|VisionOS|Wolvic/i.test(navigator.userAgent || '') ||
+      /[?&]headset=1\b/.test(location.search)) {
+    document.body.dataset.headset = '1';
+  }
+  /* Sync picker to current mode */
+  var sel = document.getElementById('js-ui-mode');
+  if (sel) sel.value = document.body.dataset.aesthetic || 'instrument';
+  /* Handle picker changes */
+  if (sel) {
+    sel.addEventListener('change', function () {
+      document.body.dataset.aesthetic = sel.value;
+      try { localStorage.setItem(_UI_KEY, sel.value); } catch (e) {}
+    });
+  }
+}());
 </script>
 <script type="module">
 'use strict';
