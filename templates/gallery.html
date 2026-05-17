@@ -1,12 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Depth Camera — Gallery</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap" rel="stylesheet">
+{% extends "base.html" %}
+{% block title %}Depth Camera — Gallery{% endblock %}
+{% block head %}
 <style>
 /* ── Design system tokens ────────────────────────────────────────────────── */
 
@@ -210,12 +204,16 @@
 /* Rows */
 [data-aesthetic="glass"] .row__link {
   border-top: 1px solid rgba(140, 215, 255, 0.08);
-  background: linear-gradient(90deg, transparent 50%, rgba(140, 215, 255, 0.02));
-  transition: background 180ms ease, box-shadow 180ms ease;
+  background: transparent;
+  transition: background 180ms ease, box-shadow 180ms ease, backdrop-filter 180ms ease;
 }
 [data-aesthetic="glass"] .row__link:hover {
-  background: linear-gradient(90deg, rgba(140, 215, 255, 0.04), rgba(140, 215, 255, 0.12));
-  box-shadow: inset 0 0 40px -10px rgba(140, 215, 255, 0.18);
+  background: transparent;
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+          backdrop-filter: blur(14px) saturate(140%);
+  box-shadow:
+    inset 0 0 0 1px rgba(140, 215, 255, 0.28),
+    0 0 28px -4px rgba(140, 215, 255, 0.45);
 }
 [data-aesthetic="glass"] .row__time-abs { text-shadow: var(--glow-text); letter-spacing: 0.02em; }
 [data-aesthetic="glass"] .row__rail-line { background: rgba(140, 215, 255, 0.18); }
@@ -262,19 +260,17 @@
 
 /* Film cards in grid mode */
 [data-aesthetic="glass"] .film {
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-          backdrop-filter: blur(18px) saturate(140%);
-  border-color: rgba(140, 215, 255, 0.16);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.04),
-    var(--glow-cyan);
+  background: transparent;
+  border-color: rgba(140, 215, 255, 0.12);
+  box-shadow: none;
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, backdrop-filter 180ms ease;
 }
 [data-aesthetic="glass"] .film:hover {
+  background: transparent;
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+          backdrop-filter: blur(14px) saturate(140%);
   border-color: var(--accent);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 0 24px -4px rgba(140, 215, 255, 0.6);
+  box-shadow: 0 0 28px -4px rgba(140, 215, 255, 0.5);
 }
 [data-aesthetic="glass"] .film__seq {
   background: rgba(8, 20, 40, 0.7);
@@ -375,6 +371,14 @@ img { display: block; }
 .btn--ghost { background: transparent; border-color: var(--line-soft); color: var(--fg-mid); }
 .btn--ghost:hover { color: var(--accent); border-color: var(--accent); }
 
+/* Square icon-only buttons for layout toggle. Higher-specificity XR override in
+   xr-bridge.js uses .btn.btn--icon so the generic ≥60px override doesn't
+   squash these into rectangles. */
+.btn.btn--icon {
+  width: 36px; height: 36px; min-height: 36px; padding: 0;
+  display: grid; place-items: center; flex-shrink: 0;
+}
+
 .dot-live {
   width: 7px; height: 7px; border-radius: 50%;
   background: oklch(0.78 0.18 145);
@@ -446,7 +450,7 @@ img { display: block; }
 .row__link {
   display: grid;
   grid-template-columns: 28px minmax(80px,100px) minmax(220px,320px) 1fr auto;
-  align-items: center; gap: 18px; padding: 14px 0;
+  align-items: center; gap: 18px; padding: 14px 18px 14px 0;
   text-decoration: none; color: inherit;
   border-top: 1px solid var(--line-soft);
   transition: background 140ms ease;
@@ -587,20 +591,16 @@ img { display: block; }
 }
 [data-mode="light"] .thumb-placeholder-tag { background: rgba(255,255,255,0.65); }
 </style>
-</head>
-<body data-aesthetic="instrument" data-mode="dark" data-card-size="m">
+{% endblock %}
+{% block body_attrs %}data-aesthetic="instrument" data-mode="dark" data-card-size="m"{% endblock %}
+{% block body %}
 <script>
-/* ── Apply persisted UI mode immediately (before first render) ─────────────── */
+/* ── Apply persisted UI mode before first render (bridge handles headset flag) */
 (function () {
-  var _UI_KEY = 'depth-ui-mode';
   try {
-    var _m = localStorage.getItem(_UI_KEY);
+    var _m = localStorage.getItem('depth-ui-mode');
     if (_m) document.body.dataset.aesthetic = _m;
   } catch (e) {}
-  if (/OculusBrowser|Quest|Pico|VisionOS|Wolvic/i.test(navigator.userAgent || '') ||
-      /[?&]headset=1\b/.test(location.search)) {
-    document.body.dataset.headset = '1';
-  }
 }());
 </script>
 <div class="app">
@@ -660,6 +660,8 @@ img { display: block; }
 
 </div>
 
+{% endblock %}
+{% block scripts %}
 <script>
 window.GALLERY_EVENTS = {{ events | tojson }};
 window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
@@ -997,8 +999,8 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
             filtered.length + ' <span style="color:var(--fg-faint)">/ ' + S.all.length + '</span>' +
           '</span>' +
           '<div style="display:flex;gap:3px">' +
-            '<button class="btn ' + (S.layout==='rows' ? 'btn--primary' : 'btn--ghost') + '" style="padding:5px 8px" data-layout="rows" title="List view">' + ROWS_ICON + '</button>' +
-            '<button class="btn ' + (S.layout==='grid' ? 'btn--primary' : 'btn--ghost') + '" style="padding:5px 8px" data-layout="grid" title="Grid view">' + GRID_ICON + '</button>' +
+            '<button class="btn btn--icon ' + (S.layout==='rows' ? 'btn--primary' : 'btn--ghost') + '" data-layout="rows" title="List view">' + ROWS_ICON + '</button>' +
+            '<button class="btn btn--icon ' + (S.layout==='grid' ? 'btn--primary' : 'btn--ghost') + '" data-layout="grid" title="Grid view">' + GRID_ICON + '</button>' +
           '</div>' +
           '<label class="ui-mode" title="UI mode">' +
             '<span class="label-xs">UI&nbsp;Mode</span>' +
@@ -1172,9 +1174,12 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
     { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
   history.scrollRestoration = 'manual';
   window.scrollTo(0, 0);
+
+  // Bridge must be inited before renderAll() so its MutationObserver is
+  // ready to auto-enhance the #js-ui-mode select when renderFilters() inserts it.
+  if (window.DepthXR) DepthXR.init();
   renderAll();
 
 }());
 </script>
-</body>
-</html>
+{% endblock %}
