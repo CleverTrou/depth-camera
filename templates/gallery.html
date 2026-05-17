@@ -59,6 +59,265 @@
 [data-aesthetic="brutalist"][data-mode="light"] { --line: oklch(0.10 0.01 250); }
 [data-aesthetic="soft"] { --font-display: var(--font-ui); --radius: 18px; --gap: 20px; --bg: oklch(0.98 0.005 80); --bg-1: oklch(1 0 0); --bg-2: oklch(0.95 0.006 80); --line: oklch(0.9 0.004 80); --line-soft: oklch(0.94 0.004 80); --fg: oklch(0.22 0.01 250); --fg-mid: oklch(0.45 0.01 250); --fg-dim: oklch(0.60 0.008 250); --fg-faint: oklch(0.75 0.005 250); color-scheme: light; }
 
+/* ── GLASS — Minority Report / translucent layered interface ─────────────── */
+[data-aesthetic="glass"] {
+  --accent-h: 198; --accent-c: 0.17; --accent-l: 0.85;
+  --accent-2: oklch(0.85 0.17 75);             /* amber secondary */
+  --font-display: var(--font-mono);
+  --radius: 2px; --gap: 18px;
+  --bg:        #03070e;
+  --bg-1:      rgba(120, 180, 220, 0.04);
+  --bg-2:      rgba(120, 180, 220, 0.08);
+  --line:      rgba(150, 220, 255, 0.18);
+  --line-soft: rgba(150, 220, 255, 0.08);
+  --fg:        oklch(0.97 0.02 198);
+  --fg-mid:    oklch(0.80 0.05 198);
+  --fg-dim:    oklch(0.62 0.06 198);
+  --fg-faint:  oklch(0.42 0.04 198);
+  --glass-bg:  rgba(8, 22, 42, 0.55);
+  --glass-bg-hi: rgba(140, 215, 255, 0.06);
+  --glow-cyan: 0 0 16px -4px rgba(140, 215, 255, 0.45);
+  --glow-text: 0 0 12px rgba(140, 215, 255, 0.45);
+  color-scheme: dark;
+}
+[data-aesthetic="glass"] html,
+[data-aesthetic="glass"] body {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0, 110, 170, 0.22), transparent 65%),
+    radial-gradient(ellipse 100% 80% at 50% 120%, rgba(8, 18, 50, 0.55), transparent 60%),
+    linear-gradient(180deg, #050c18 0%, #02050b 100%);
+  background-attachment: fixed;
+}
+/* Faint grid plate behind everything */
+[data-aesthetic="glass"] body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    linear-gradient(rgba(150, 220, 255, 0.045) 1px, transparent 1px) 0 0 / 80px 80px,
+    linear-gradient(90deg, rgba(150, 220, 255, 0.045) 1px, transparent 1px) 0 0 / 80px 80px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 35%, #000, transparent 95%);
+          mask-image: radial-gradient(ellipse 75% 55% at 50% 35%, #000, transparent 95%);
+}
+/* In a passthrough-capable XR browser: drop the page background entirely and
+   let the headset's real-room view show through the translucent cards. */
+[data-aesthetic="glass"][data-headset="1"] html,
+[data-aesthetic="glass"][data-headset="1"] body { background: transparent !important; }
+[data-aesthetic="glass"][data-headset="1"] body::before,
+[data-aesthetic="glass"][data-headset="1"] body::after { display: none; }
+/* Hairline scanlines, just at the threshold of perception */
+[data-aesthetic="glass"] body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1000;
+  background: repeating-linear-gradient(0deg,
+    transparent 0 2px, rgba(140, 220, 255, 0.011) 3px 4px);
+  mix-blend-mode: screen;
+}
+[data-aesthetic="glass"] .app { position: relative; z-index: 1; }
+
+/* Header brand */
+[data-aesthetic="glass"] .hdr__title {
+  letter-spacing: 0.16em; font-weight: 500; text-transform: uppercase;
+  text-shadow: var(--glow-text);
+}
+[data-aesthetic="glass"] .hdr__sub { color: oklch(0.62 0.06 198); letter-spacing: 0.08em; }
+[data-aesthetic="glass"] .logomark {
+  background: rgba(140, 215, 255, 0.06);
+  border-color: rgba(140, 215, 255, 0.32);
+  box-shadow:
+    inset 0 0 18px -4px rgba(140, 215, 255, 0.25),
+    0 0 22px -8px rgba(140, 215, 255, 0.45);
+}
+
+/* Glass surfaces */
+[data-aesthetic="glass"] .hdr__readout,
+[data-aesthetic="glass"] .filters,
+[data-aesthetic="glass"] .empty {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+          backdrop-filter: blur(18px) saturate(140%);
+  border-color: rgba(140, 215, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    var(--glow-cyan),
+    0 12px 38px -12px rgba(0, 40, 80, 0.55);
+  position: relative;
+}
+/* Registration corner marks */
+[data-aesthetic="glass"] .hdr__readout::before,
+[data-aesthetic="glass"] .hdr__readout::after,
+[data-aesthetic="glass"] .filters::before,
+[data-aesthetic="glass"] .filters::after {
+  content: ""; position: absolute; width: 10px; height: 10px;
+  border-color: var(--accent); opacity: 0.65; pointer-events: none;
+}
+[data-aesthetic="glass"] .hdr__readout::before,
+[data-aesthetic="glass"] .filters::before {
+  top: -2px; left: -2px; border-top: 1px solid; border-left: 1px solid;
+}
+[data-aesthetic="glass"] .hdr__readout::after,
+[data-aesthetic="glass"] .filters::after {
+  bottom: -2px; right: -2px; border-bottom: 1px solid; border-right: 1px solid;
+}
+
+[data-aesthetic="glass"] .stat {
+  background: linear-gradient(180deg, rgba(140, 215, 255, 0.05), rgba(140, 215, 255, 0.01));
+  border-right-color: rgba(140, 215, 255, 0.1);
+}
+[data-aesthetic="glass"] .stat__v { text-shadow: var(--glow-text); }
+[data-aesthetic="glass"] .label-xs { color: oklch(0.55 0.05 198); letter-spacing: 0.1em; }
+
+/* Chips */
+[data-aesthetic="glass"] .chip {
+  background: rgba(140, 215, 255, 0.05);
+  border-color: rgba(140, 215, 255, 0.22);
+  color: oklch(0.85 0.05 198);
+}
+[data-aesthetic="glass"] .chip--on {
+  background: rgba(140, 215, 255, 0.16);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 14px -2px rgba(140, 215, 255, 0.45);
+}
+
+/* Buttons */
+[data-aesthetic="glass"] .btn {
+  background: rgba(140, 215, 255, 0.05);
+  border-color: rgba(140, 215, 255, 0.22);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+[data-aesthetic="glass"] .btn:hover { color: var(--accent); border-color: var(--accent); box-shadow: 0 0 16px -4px rgba(140, 215, 255, 0.5); }
+[data-aesthetic="glass"] .btn--primary {
+  background: linear-gradient(180deg, oklch(0.92 0.16 198), oklch(0.74 0.18 215));
+  border-color: rgba(190, 235, 255, 0.6);
+  color: #021018;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 0 1px rgba(190, 235, 255, 0.3),
+    0 0 24px -4px rgba(140, 215, 255, 0.65);
+  text-shadow: none;
+}
+[data-aesthetic="glass"] .btn--primary:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 0 0 1px rgba(190, 235, 255, 0.5),
+    0 0 36px -2px rgba(140, 215, 255, 0.85);
+}
+
+/* Day group dividers */
+[data-aesthetic="glass"] .day__header { border-bottom-color: rgba(140, 215, 255, 0.12); }
+[data-aesthetic="glass"] .day__title { letter-spacing: 0.1em; text-transform: uppercase; font-weight: 400; text-shadow: var(--glow-text); }
+[data-aesthetic="glass"] .day__code { color: oklch(0.55 0.05 198); }
+[data-aesthetic="glass"] .day__meta { color: oklch(0.7 0.05 198); }
+
+/* Rows */
+[data-aesthetic="glass"] .row__link {
+  border-top: 1px solid rgba(140, 215, 255, 0.08);
+  background: linear-gradient(90deg, transparent 50%, rgba(140, 215, 255, 0.02));
+  transition: background 180ms ease, box-shadow 180ms ease;
+}
+[data-aesthetic="glass"] .row__link:hover {
+  background: linear-gradient(90deg, rgba(140, 215, 255, 0.04), rgba(140, 215, 255, 0.12));
+  box-shadow: inset 0 0 40px -10px rgba(140, 215, 255, 0.18);
+}
+[data-aesthetic="glass"] .row__time-abs { text-shadow: var(--glow-text); letter-spacing: 0.02em; }
+[data-aesthetic="glass"] .row__rail-line { background: rgba(140, 215, 255, 0.18); }
+[data-aesthetic="glass"] .row__rail-dot { background: var(--bg); border-color: rgba(140, 215, 255, 0.5); }
+[data-aesthetic="glass"] .row__rail-dot.is-newest {
+  background: var(--accent); border-color: var(--accent);
+  box-shadow:
+    0 0 0 4px var(--bg),
+    0 0 0 5px var(--accent),
+    0 0 14px var(--accent),
+    0 0 28px rgba(140, 215, 255, 0.55);
+}
+
+/* Media frames — glow + corner ticks via inner inset */
+[data-aesthetic="glass"] .row__media,
+[data-aesthetic="glass"] .film__media {
+  border-color: rgba(140, 215, 255, 0.22);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 0 18px -4px rgba(0, 60, 110, 0.5);
+  background: #02060d;
+}
+[data-aesthetic="glass"] .row__media::after,
+[data-aesthetic="glass"] .film__media::after {
+  /* faint inner reticle overlay */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(rgba(140, 215, 255, 0.04) 1px, transparent 1px) 50% 50% / 100% 33.33%,
+    linear-gradient(90deg, rgba(140, 215, 255, 0.04) 1px, transparent 1px) 50% 50% / 33.33% 100%;
+}
+[data-aesthetic="glass"] .row__media-pip,
+[data-aesthetic="glass"] .film__pip {
+  border-color: rgba(140, 215, 255, 0.6);
+  box-shadow:
+    0 0 0 1px rgba(140, 215, 255, 0.15),
+    0 6px 16px rgba(0, 30, 60, 0.6);
+}
+[data-aesthetic="glass"] .row__media-pip-tag,
+[data-aesthetic="glass"] .film__pip-tag {
+  background: rgba(8, 20, 40, 0.85);
+  color: var(--accent);
+  border: 1px solid rgba(140, 215, 255, 0.4);
+}
+
+/* Film cards in grid mode */
+[data-aesthetic="glass"] .film {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+          backdrop-filter: blur(18px) saturate(140%);
+  border-color: rgba(140, 215, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    var(--glow-cyan);
+}
+[data-aesthetic="glass"] .film:hover {
+  border-color: var(--accent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 24px -4px rgba(140, 215, 255, 0.6);
+}
+[data-aesthetic="glass"] .film__seq {
+  background: rgba(8, 20, 40, 0.7);
+  border-color: rgba(140, 215, 255, 0.3);
+  color: var(--accent);
+}
+
+/* Footer */
+[data-aesthetic="glass"] .ftr { border-top-color: rgba(140, 215, 255, 0.12); }
+
+/* Live dot — accent cyan with bigger halo */
+[data-aesthetic="glass"] .dot-live {
+  background: oklch(0.85 0.18 145);
+  box-shadow: 0 0 8px oklch(0.85 0.18 145), 0 0 0 0 oklch(0.85 0.18 145 / 0.6);
+}
+[data-aesthetic="glass"] @keyframes pulse {
+  0%, 100% { box-shadow: 0 0 10px oklch(0.85 0.18 145), 0 0 0 0 oklch(0.85 0.18 145 / 0.55); }
+  50%       { box-shadow: 0 0 14px oklch(0.85 0.18 145), 0 0 0 8px oklch(0.85 0.18 145 / 0); }
+}
+
+/* Empty state */
+[data-aesthetic="glass"] .empty__title { letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); text-shadow: var(--glow-text); }
+
+/* UI Mode select (appears in filters bar) */
+.ui-mode { display: inline-flex; align-items: center; gap: 6px; }
+.ui-mode .label-xs { color: var(--fg-faint); white-space: nowrap; }
+.ui-mode__sel {
+  appearance: none; -webkit-appearance: none;
+  font: inherit; font-family: var(--font-mono); font-size: 11px;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 6px 22px 6px 10px; line-height: 1;
+  background: var(--bg-1) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'><path fill='%2389a' d='M0 0h8L4 6z'/></svg>") no-repeat right 8px center;
+  color: var(--fg-mid); border: 1px solid var(--line); border-radius: var(--radius);
+  cursor: pointer; transition: border-color 120ms, color 120ms;
+}
+.ui-mode__sel:hover, .ui-mode__sel:focus { color: var(--fg); border-color: var(--accent); outline: none; }
+[data-aesthetic="glass"] .ui-mode__sel {
+  background-color: rgba(140, 215, 255, 0.06);
+  border-color: rgba(140, 215, 255, 0.28);
+  color: var(--accent);
+}
+[data-aesthetic="glass"] .ui-mode__sel:hover { box-shadow: 0 0 14px -3px rgba(140, 215, 255, 0.5); }
+
 [data-card-size="s"] { --card-h: 160px; }
 [data-card-size="m"] { --card-h: 220px; }
 [data-card-size="l"] { --card-h: 320px; }
@@ -330,6 +589,19 @@ img { display: block; }
 </style>
 </head>
 <body data-aesthetic="instrument" data-mode="dark" data-card-size="m">
+<script>
+/* ── Apply persisted UI mode immediately (before first render) ─────────────── */
+(function () {
+  try {
+    var _m = localStorage.getItem('depth-ui-mode');
+    if (_m) document.body.dataset.aesthetic = _m;
+  } catch (e) {}
+  if (/OculusBrowser|Quest|Pico|VisionOS|Wolvic/i.test(navigator.userAgent || '') ||
+      /[?&]headset=1\b/.test(location.search)) {
+    document.body.dataset.headset = '1';
+  }
+}());
+</script>
 <div class="app">
 
   <header class="hdr">
@@ -397,6 +669,24 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
 
   var DEFAULT_SOURCES = (window.GALLERY_DEFAULT_SOURCES || ['ifttt']).slice();
   var SOURCE_LABELS = { 'ifttt': 'IFTTT', 'pi_monitor': 'Pi monitor' };
+
+  /* ── UI Mode (shared with viewer + settings) ───────────────────────────── */
+  var _UI_KEY = 'depth-ui-mode';
+  var UI_MODES = [
+    { value: 'glass',      label: 'Glass' },
+    { value: 'instrument', label: 'Instrument' },
+    { value: 'cinematic',  label: 'Cinematic' },
+    { value: 'brutalist',  label: 'Brutalist' },
+    { value: 'soft',       label: 'Soft' },
+  ];
+  function getUiMode() {
+    try { return localStorage.getItem(_UI_KEY) || document.body.dataset.aesthetic || 'instrument'; }
+    catch (e) { return document.body.dataset.aesthetic || 'instrument'; }
+  }
+  function setUiMode(m) {
+    document.body.dataset.aesthetic = m;
+    try { localStorage.setItem(_UI_KEY, m); } catch (e) {}
+  }
 
   var S = {
     all:     window.GALLERY_EVENTS || [],
@@ -709,6 +999,15 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
             '<button class="btn ' + (S.layout==='rows' ? 'btn--primary' : 'btn--ghost') + '" style="padding:5px 8px" data-layout="rows" title="List view">' + ROWS_ICON + '</button>' +
             '<button class="btn ' + (S.layout==='grid' ? 'btn--primary' : 'btn--ghost') + '" style="padding:5px 8px" data-layout="grid" title="Grid view">' + GRID_ICON + '</button>' +
           '</div>' +
+          '<label class="ui-mode" title="UI mode">' +
+            '<span class="label-xs">UI&nbsp;Mode</span>' +
+            '<select id="js-ui-mode" class="ui-mode__sel">' +
+              UI_MODES.map(function (m) {
+                var sel = m.value === getUiMode() ? ' selected' : '';
+                return '<option value="' + m.value + '"' + sel + '>' + m.label + '</option>';
+              }).join('') +
+            '</select>' +
+          '</label>' +
           '<button class="btn btn--ghost" data-clear style="font-size:12px;padding:6px 12px">Clear</button>' +
         '</div>' +
       '</div>'
@@ -828,6 +1127,13 @@ window.GALLERY_DEFAULT_SOURCES = {{ default_sources | tojson }};
       var f = getFiltered();
       S.visible = f.length;
       renderEvents(f); return;
+    }
+  });
+
+  /* UI Mode picker (change event, not click) */
+  document.querySelector('.app').addEventListener('change', function (e) {
+    if (e.target && e.target.id === 'js-ui-mode') {
+      setUiMode(e.target.value);
     }
   });
 

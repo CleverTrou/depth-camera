@@ -20,6 +20,162 @@
   --radius: 10px;
   color-scheme: dark;
 }
+
+/* ── GLASS — Minority Report / translucent layered interface ─────────────── */
+[data-aesthetic="glass"] {
+  --accent-h: 198; --accent-c: 0.17; --accent-l: 0.85;
+  --accent: oklch(var(--accent-l) var(--accent-c) var(--accent-h));
+  --radius: 2px;
+  --bg:        #03070e;
+  --bg-1:      rgba(120, 180, 220, 0.05);
+  --bg-2:      rgba(120, 180, 220, 0.09);
+  --line:      rgba(150, 220, 255, 0.22);
+  --line-soft: rgba(150, 220, 255, 0.10);
+  --fg:        oklch(0.97 0.02 198);
+  --fg-mid:    oklch(0.80 0.05 198);
+  --fg-dim:    oklch(0.62 0.06 198);
+  --fg-faint:  oklch(0.45 0.04 198);
+  --glow-text: 0 0 12px rgba(140, 215, 255, 0.45);
+}
+[data-aesthetic="glass"] html,
+[data-aesthetic="glass"] body {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0, 110, 170, 0.22), transparent 65%),
+    radial-gradient(ellipse 100% 80% at 50% 120%, rgba(8, 18, 50, 0.55), transparent 60%),
+    linear-gradient(180deg, #050c18 0%, #02050b 100%);
+  background-attachment: fixed;
+}
+[data-aesthetic="glass"] body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    linear-gradient(rgba(150, 220, 255, 0.045) 1px, transparent 1px) 0 0 / 80px 80px,
+    linear-gradient(90deg, rgba(150, 220, 255, 0.045) 1px, transparent 1px) 0 0 / 80px 80px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 35%, #000, transparent 95%);
+          mask-image: radial-gradient(ellipse 75% 55% at 50% 35%, #000, transparent 95%);
+}
+[data-aesthetic="glass"] body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1000;
+  background: repeating-linear-gradient(0deg,
+    transparent 0 2px, rgba(140, 220, 255, 0.012) 3px 4px);
+  mix-blend-mode: screen;
+}
+[data-aesthetic="glass"] .page { position: relative; z-index: 1; }
+
+[data-aesthetic="glass"] .page-title {
+  font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.14em; font-weight: 500; text-transform: uppercase;
+  text-shadow: var(--glow-text);
+}
+[data-aesthetic="glass"] .page-header { border-bottom-color: rgba(140, 215, 255, 0.16); }
+
+[data-aesthetic="glass"] .section {
+  background: rgba(8, 22, 42, 0.55);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+          backdrop-filter: blur(18px) saturate(140%);
+  border-color: rgba(140, 215, 255, 0.18);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 18px -6px rgba(140, 215, 255, 0.35),
+    0 12px 38px -12px rgba(0, 40, 80, 0.55);
+  position: relative;
+}
+/* Corner registration marks */
+[data-aesthetic="glass"] .section::before,
+[data-aesthetic="glass"] .section::after {
+  content: ""; position: absolute; width: 10px; height: 10px;
+  border-color: var(--accent); opacity: 0.6; pointer-events: none;
+}
+[data-aesthetic="glass"] .section::before { top: -2px; left: -2px; border-top: 1px solid; border-left: 1px solid; }
+[data-aesthetic="glass"] .section::after  { bottom: -2px; right: -2px; border-bottom: 1px solid; border-right: 1px solid; }
+
+[data-aesthetic="glass"] .section-title {
+  font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--accent); text-shadow: var(--glow-text);
+  border-bottom-color: rgba(140, 215, 255, 0.16);
+}
+
+[data-aesthetic="glass"] label { color: oklch(0.65 0.05 198); }
+[data-aesthetic="glass"] input,
+[data-aesthetic="glass"] select {
+  background: rgba(140, 215, 255, 0.05);
+  border-color: rgba(140, 215, 255, 0.22);
+  color: var(--fg);
+}
+[data-aesthetic="glass"] input:focus,
+[data-aesthetic="glass"] select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 14px -2px rgba(140, 215, 255, 0.5);
+}
+
+[data-aesthetic="glass"] .btn {
+  background: rgba(140, 215, 255, 0.05);
+  border-color: rgba(140, 215, 255, 0.22);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+[data-aesthetic="glass"] .btn:hover {
+  color: var(--accent); border-color: var(--accent);
+  box-shadow: 0 0 16px -4px rgba(140, 215, 255, 0.5);
+}
+[data-aesthetic="glass"] .btn--primary {
+  background: linear-gradient(180deg, oklch(0.92 0.16 198), oklch(0.74 0.18 215));
+  border-color: rgba(190, 235, 255, 0.6);
+  color: #021018;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 0 1px rgba(190, 235, 255, 0.3),
+    0 0 24px -4px rgba(140, 215, 255, 0.65);
+}
+[data-aesthetic="glass"] .btn--danger {
+  background: rgba(255, 90, 90, 0.08);
+  border-color: oklch(0.7 0.18 25);
+  color: oklch(0.85 0.16 25);
+}
+
+[data-aesthetic="glass"] .fov-tab {
+  background: rgba(140, 215, 255, 0.04);
+  border-color: rgba(140, 215, 255, 0.18);
+  color: var(--fg-mid);
+}
+[data-aesthetic="glass"] .fov-tab.active {
+  background: rgba(140, 215, 255, 0.18);
+  border-color: var(--accent); color: var(--accent);
+  box-shadow: 0 0 14px -3px rgba(140, 215, 255, 0.5);
+}
+
+[data-aesthetic="glass"] .banner { -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+[data-aesthetic="glass"] .banner--ok    { background: rgba(80, 200, 130, 0.12); border: 1px solid oklch(0.5 0.14 145); color: oklch(0.9 0.16 145); }
+[data-aesthetic="glass"] .banner--error { background: rgba(220, 90, 90, 0.12);  border: 1px solid oklch(0.55 0.16 25); color: oklch(0.9 0.16 25); }
+
+[data-aesthetic="glass"] .save-bar {
+  background: rgba(6, 18, 36, 0.65);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+          backdrop-filter: blur(18px) saturate(140%);
+  border-top: 1px solid rgba(140, 215, 255, 0.18);
+}
+
+/* Headset passthrough — drop the page background entirely */
+[data-aesthetic="glass"][data-headset="1"] html,
+[data-aesthetic="glass"][data-headset="1"] body { background: transparent !important; }
+[data-aesthetic="glass"][data-headset="1"] body::before,
+[data-aesthetic="glass"][data-headset="1"] body::after { display: none; }
+[data-aesthetic="glass"][data-headset="1"] .save-bar { background: rgba(6, 18, 36, 0.78); }
+
+/* UI Mode select (compact, in page-header) */
+.ui-mode__sel {
+  appearance: none; -webkit-appearance: none;
+  font: inherit; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 6px 22px 6px 10px; line-height: 1;
+  background: var(--bg-1) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'><path fill='%2389a' d='M0 0h8L4 6z'/></svg>") no-repeat right 8px center;
+  color: var(--fg-mid); border: 1px solid var(--line); border-radius: var(--radius);
+  cursor: pointer; transition: border-color 120ms, color 120ms; width: auto;
+}
+.ui-mode__sel:hover, .ui-mode__sel:focus { color: var(--fg); border-color: var(--accent); outline: none; }
+[data-aesthetic="glass"] .ui-mode__sel {
+  background-color: rgba(140, 215, 255, 0.06);
+  border-color: rgba(140, 215, 255, 0.28);
+  color: var(--accent);
+}
+[data-aesthetic="glass"] .ui-mode__sel:hover { box-shadow: 0 0 14px -3px rgba(140, 215, 255, 0.5); }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { background: var(--bg); color: var(--fg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; font-size: 14px; -webkit-font-smoothing: antialiased; min-height: 100vh; }
 a { color: inherit; text-decoration: none; }
@@ -76,12 +232,33 @@ label { color: var(--fg-mid); font-size: 12px; letter-spacing: 0.04em; text-tran
 .save-bar { position: sticky; bottom: 0; background: var(--bg); border-top: 1px solid var(--line-soft); padding: 14px 0; margin-top: 24px; display: flex; align-items: center; gap: 12px; }
 </style>
 </head>
-<body>
+<body data-aesthetic="instrument">
+<script>
+/* ── Apply persisted UI mode + headset detection ─────────────────────────── */
+(function () {
+  var _UI_KEY = 'depth-ui-mode';
+  try {
+    var _saved = localStorage.getItem(_UI_KEY);
+    if (_saved) document.body.dataset.aesthetic = _saved;
+  } catch (e) {}
+  if (/OculusBrowser|Quest|Pico|VisionOS|Wolvic/i.test(navigator.userAgent || '') ||
+      /[?&]headset=1\b/.test(location.search)) {
+    document.body.dataset.headset = '1';
+  }
+}());
+</script>
 <div class="page">
 
   <div class="page-header">
     <a href="/" title="Back to gallery">&#x2039;</a>
     <div class="page-title">Settings</div>
+    <select id="js-ui-mode" class="ui-mode__sel" title="UI mode" style="margin-left:auto">
+      <option value="glass">Glass</option>
+      <option value="instrument">Instrument</option>
+      <option value="cinematic">Cinematic</option>
+      <option value="brutalist">Brutalist</option>
+      <option value="soft">Soft</option>
+    </select>
   </div>
 
   {% for msg in saved %}
@@ -291,6 +468,18 @@ label { color: var(--fg-mid); font-size: 12px; letter-spacing: 0.04em; text-tran
 
 <script>
 'use strict';
+
+// ── UI Mode picker ────────────────────────────────────────────────────────
+(function () {
+  var sel = document.getElementById('js-ui-mode');
+  if (!sel) return;
+  // Sync to current body aesthetic
+  sel.value = document.body.dataset.aesthetic || 'instrument';
+  sel.addEventListener('change', function () {
+    document.body.dataset.aesthetic = sel.value;
+    try { localStorage.setItem('depth-ui-mode', sel.value); } catch (e) {}
+  });
+}());
 
 // ── Save button feedback ──────────────────────────────────────────────────
 document.querySelector('form').addEventListener('submit', function() {
