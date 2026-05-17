@@ -138,7 +138,7 @@ Settings are written to `/opt/depth-camera/config.yaml`; `depth-relay` and `dept
 - **Raspberry Pi 5** (8 GB or 16 GB recommended). Pi 4 works but inference is slower.
 - **Aqara G5 Pro** security camera — or any RTSP camera with a supported diagonal FOV in the settings database
 - **Raspberry Pi OS** 64-bit, Bookworm/Trixie
-- **ffmpeg 7.x** (installed by setup script; note: `ffmpeg <6` uses `nonkey` for `-skip_frame` — 7.x uses `nokey`)
+- **ffmpeg 7.x** (installed by setup script; note: ffmpeg < 7.0 uses `nonkey` for `-skip_frame` — 7.0+ uses `nokey`)
 - **Python 3.11+** (ships with Bookworm)
 - **[IFTTT](https://ifttt.com) account** (free tier sufficient) with Aqara Home connected
 
@@ -180,7 +180,7 @@ NTFY_TOPIC_ALERTS=   # optional — ntfy.sh topic for push notifications
 
 ### 3. Configure via the Settings page
 
-After starting the services (step 5), open `http://<PI_IP>:8080/settings` and set:
+After starting the services (step 4), open `http://<PI_IP>:8080/settings` and set:
 
 - **Gallery PIN** — recommended; the gallery serves all camera images unauthenticated without it
 - **Camera FOV** — use the camera database or two-point measurement tool for best point cloud geometry
@@ -198,12 +198,12 @@ pipeline:
   ply_ground_correction: true # RANSAC floor leveling
 
 detection:
-  min_changed_pct: 15.0      # EWMA baseline is p50 ~2%; 15% = sustained gusts only
+  min_changed_pct: 20.0      # EWMA baseline is p50 ~2%; tune up from the default if too sensitive
   diff_display_threshold: 40  # orange mask threshold (0 = same as detection)
   cooldown: 300              # seconds between pi_monitor triggers
 ```
 
-Restart after editing: `sudo systemctl restart depth-relay depth-monitor`
+Restart after editing: `sudo systemctl restart depth-relay depth-monitor depth-gallery`
 
 ### 4. Start services
 
@@ -336,13 +336,13 @@ For the Aqara G5 Pro (120° diagonal, 16:9 sensor), the horizontal FOV is ~113°
 | `compare_height` | 240 | Comparison frame height |
 | `threshold` | 20 | Per-pixel change threshold (0–255) |
 | `diff_display_threshold` | 40 | Threshold for orange diff visualization (0 = same as threshold) |
-| `min_changed_pct` | 15.0 | % of pixels that must change to count as motion |
+| `min_changed_pct` | 20.0 | % of pixels that must change to count as motion |
 | `min_mean_diff` | 12.0 | Minimum mean pixel intensity change |
 | `confirm_frames` | 3 | Consecutive above-threshold polls to confirm motion |
 | `cooldown` | 300 | Seconds between triggers |
 | `bg_alpha` | 0.9 | EWMA adaptation rate (higher = slower adaptation) |
 
-With EWMA, the background absorbs persistent motion (wind, shadows) over ~30s. p50 noise floor drops to 1–4%, so `min_changed_pct: 15` only catches sustained significant changes.
+With EWMA, the background absorbs persistent motion (wind, shadows) over ~30s. p50 noise floor drops to 1–4%, so `min_changed_pct: 20` (the default) only fires on sustained significant changes.
 
 ## Resource Usage
 
