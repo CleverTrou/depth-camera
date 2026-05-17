@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1{% block viewport_extra %}{% endblock %}" />
+<title>{% block title %}Depth Camera{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap" rel="stylesheet">
+{% block head %}{% endblock %}
+</head>
+<body {% block body_attrs %}data-aesthetic="instrument" data-mode="dark"{% endblock %}>
+{% block body %}{% endblock %}
+<script src="{{ url_for('static', filename='xr-bridge.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

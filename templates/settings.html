@@ -1,9 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Settings — Depth Camera</title>
+{% extends "base.html" %}
+{% block title %}Settings — Depth Camera{% endblock %}
+{% block head %}
 <style>
 :root {
   --accent-h: 200; --accent-c: 0.13; --accent-l: 0.78;
@@ -187,7 +184,9 @@ label { color: var(--fg-mid); font-size: 12px; letter-spacing: 0.04em; text-tran
 .field-row { display: flex; align-items: center; gap: 12px; }
 .field-hint { color: var(--fg-faint); font-size: 11px; margin-top: 2px; }
 
-.page { max-width: 760px; margin: 0 auto; padding: 24px 20px 60px; }
+.page { max-width: 880px; margin: 0 auto; padding: 24px 20px 60px; }
+@media (min-width: 1280px) { .page { max-width: 1140px; padding: 36px 40px 100px; } .page-header { padding-bottom: 28px; margin-bottom: 36px; } .page-title { font-size: 26px; } .section { padding: 28px 30px; margin-bottom: 22px; } }
+@media (min-width: 1600px) { .page { max-width: 1280px; } }
 .page-header { display: flex; align-items: center; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--line-soft); margin-bottom: 28px; }
 .page-header a { color: var(--fg-mid); font-size: 18px; }
 .page-header a:hover { color: var(--accent); }
@@ -230,20 +229,22 @@ label { color: var(--fg-mid); font-size: 12px; letter-spacing: 0.04em; text-tran
 .toggle-status.is-inactive { color: var(--fg-faint); }
 
 .save-bar { position: sticky; bottom: 0; background: var(--bg); border-top: 1px solid var(--line-soft); padding: 14px 0; margin-top: 24px; display: flex; align-items: center; gap: 12px; }
-</style>
-</head>
-<body data-aesthetic="instrument">
+{% endblock %}
+{% block body %}
 <script>
-/* ── Apply persisted UI mode + headset detection ─────────────────────────── */
+/* ── Apply persisted UI mode before first render ─────────────────────────── */
 (function () {
-  var _UI_KEY = 'depth-ui-mode';
   try {
-    var _saved = localStorage.getItem(_UI_KEY);
-    if (_saved) document.body.dataset.aesthetic = _saved;
+    var _m = localStorage.getItem('depth-ui-mode');
+    if (_m) document.body.dataset.aesthetic = _m;
   } catch (e) {}
-  if (/OculusBrowser|Quest|Pico|VisionOS|Wolvic/i.test(navigator.userAgent || '') ||
-      /[?&]headset=1\b/.test(location.search)) {
-    document.body.dataset.headset = '1';
+  var sel = document.getElementById('js-ui-mode');
+  if (sel) {
+    sel.value = document.body.dataset.aesthetic || 'instrument';
+    sel.addEventListener('change', function () {
+      document.body.dataset.aesthetic = sel.value;
+      try { localStorage.setItem('depth-ui-mode', sel.value); } catch (e) {}
+    });
   }
 }());
 </script>
@@ -474,13 +475,16 @@ label { color: var(--fg-mid); font-size: 12px; letter-spacing: 0.04em; text-tran
   var _UI_KEY = 'depth-ui-mode';
   var sel = document.getElementById('js-ui-mode');
   if (!sel) return;
-  // Sync to current body aesthetic
+  // Sync to current body aesthetic before bridge enhances the select
   sel.value = document.body.dataset.aesthetic || 'instrument';
   sel.addEventListener('change', function () {
     document.body.dataset.aesthetic = sel.value;
     try { localStorage.setItem(_UI_KEY, sel.value); } catch (e) {}
   });
 }());
+
+// Bridge builds the slide-down bar, enhances selects, and injects XR CSS
+if (window.DepthXR) DepthXR.init();
 
 // ── Save button feedback ──────────────────────────────────────────────────
 document.querySelector('form').addEventListener('submit', function() {
@@ -703,5 +707,5 @@ function toggleMonitor(action) {
     });
 }
 </script>
-</body>
-</html>
+{% endblock %}
+{% block scripts %}{% endblock %}

@@ -1,12 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-<title>{{ event_id }} — Depth Camera</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500&display=swap" rel="stylesheet">
+{% extends "base.html" %}
+{% block title %}{{ event_id }} — Depth Camera{% endblock %}
+{% block viewport_extra %}, user-scalable=no{% endblock %}
+{% block head %}
 <style>
 /* ── Design system tokens ────────────────────────────────────────────────── */
 :root {
@@ -110,7 +105,11 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   display: grid;
   grid-template-rows: auto 1fr auto;
   background: var(--bg);
+  transition: top 240ms cubic-bezier(.2,.7,.2,1);
 }
+/* When the XR bar is open, push viewer down 54 px so the header stays clear.
+   The bridge hides the bar during a live session, so top returns to 0. */
+body:has(.xrbar.is-open):not([data-xr-active]) .viewer { top: 54px; }
 
 /* Header */
 .vhdr {
@@ -439,26 +438,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 [data-aesthetic="glass"][data-headset="1"] .dock { background: rgba(6, 18, 36, 0.55); }
 [data-aesthetic="glass"][data-headset="1"] .dslider { background: transparent !important; }
 
-/* UI Mode cycle button (replaces <select> — more reliable in VR browsers) */
-.ui-mode__btn {
-  font: inherit; font-family: var(--font-mono); font-size: 11px;
-  letter-spacing: 0.04em; text-transform: uppercase;
-  padding: 6px 10px; line-height: 1;
-  display: inline-flex; align-items: center; gap: 7px;
-  background: var(--bg-1);
-  color: var(--fg-mid); border: 1px solid var(--line); border-radius: var(--radius);
-  cursor: pointer; transition: border-color 120ms, color 120ms;
-  white-space: nowrap;
-}
-.ui-mode__btn:hover, .ui-mode__btn:focus { color: var(--fg); border-color: var(--accent); outline: none; }
-.ui-mode__btn__icon { font-size: 13px; opacity: 0.5; transition: opacity 120ms; line-height: 1; }
-.ui-mode__btn:hover .ui-mode__btn__icon { opacity: 1; }
-[data-aesthetic="glass"] .ui-mode__btn {
-  background: rgba(140, 215, 255, 0.06);
-  border-color: rgba(140, 215, 255, 0.28);
-  color: var(--accent);
-}
-[data-aesthetic="glass"] .ui-mode__btn:hover { box-shadow: 0 0 14px -3px rgba(140, 215, 255, 0.5); }
+/* UI mode select in dock — xr-bridge.js auto-enhances it into .xrsel */
 </style>
 
 <!-- Three.js importmap — loaded lazily only when Cloud mode is activated -->
@@ -470,8 +450,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   }
 }
 </script>
-</head>
-<body data-aesthetic="instrument" data-mode="dark">
+{% endblock %}
+{% block body %}
 <div class="viewer">
 
   <!-- ── Header ────────────────────────────────────────────────────────────── -->
@@ -509,10 +489,6 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
         <span class="dock__pill-label">Cloud</span>
         <span class="dock__pill-hint">point cloud</span>
       </button>
-      <button class="dock__pill" data-mode="xr">
-        <span class="dock__pill-label">XR</span>
-        <span class="dock__pill-hint">vr · ar</span>
-      </button>
       {% if event.has_motion_diff %}
       <button class="dock__pill" data-mode="diff">
         <span class="dock__pill-label">Diff</span>
@@ -523,48 +499,38 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     <div class="dock__actions">
       <a href="/" class="btn btn--ghost">&#x2039; Gallery</a>
       {% if event.has_ply %}<a href="/events/{{ event_id }}/pointcloud.ply" class="btn" download="{{ event_id }}.ply">PLY</a>{% endif %}
-      <button id="js-ui-mode" class="ui-mode__btn" title="Cycle UI mode">
-        <span id="js-ui-mode-label">INSTRUMENT</span>
-        <span class="ui-mode__btn__icon" aria-hidden>↻</span>
-      </button>
+      <select id="js-ui-mode" title="UI mode">
+        <option value="glass">Glass</option>
+        <option value="instrument">Instrument</option>
+        <option value="cinematic">Cinematic</option>
+        <option value="brutalist">Brutalist</option>
+        <option value="soft">Soft</option>
+      </select>
     </div>
-    <!-- XR auto-detect banner inserted by JS -->
+    <!-- XR entry handled by xr-bridge.js slide-down bar and exit pill -->
   </div>
 
 </div><!-- .viewer -->
 
+{% endblock %}
+{% block scripts %}
 <script>
 window.VIEWER_EVENT = {{ event | tojson }};
 </script>
 <script>
-/* ── Apply persisted UI mode + headset detection ─────────────────────────── */
+/* ── Apply persisted UI mode before first render (bridge handles headset flag) */
 (function () {
-  var _UI_KEY   = 'depth-ui-mode';
-  var _UI_MODES = ['glass', 'instrument', 'cinematic', 'brutalist', 'soft'];
   try {
-    var _saved = localStorage.getItem(_UI_KEY);
-    if (_saved) document.body.dataset.aesthetic = _saved;
+    var _m = localStorage.getItem('depth-ui-mode');
+    if (_m) document.body.dataset.aesthetic = _m;
   } catch (e) {}
-  if (/OculusBrowser|Quest|Pico|VisionOS|Wolvic/i.test(navigator.userAgent || '') ||
-      /[?&]headset=1\b/.test(location.search)) {
-    document.body.dataset.headset = '1';
-  }
-  /* Sync button label to current mode */
-  var btn = document.getElementById('js-ui-mode');
-  var lbl = document.getElementById('js-ui-mode-label');
-  function _syncLabel(m) { if (lbl) lbl.textContent = (m || 'instrument').toUpperCase(); }
-  _syncLabel(document.body.dataset.aesthetic);
-  /* Handle click — cycles through modes in order */
-  if (btn) {
-    btn.addEventListener('click', function () {
-      var cur  = document.body.dataset.aesthetic || 'instrument';
-      var idx  = _UI_MODES.indexOf(cur);
-      var next = _UI_MODES[(idx + 1) % _UI_MODES.length];
-      document.body.dataset.aesthetic = next;
-      _syncLabel(next);
-      try { localStorage.setItem(_UI_KEY, next); } catch (e) {}
-    });
-  }
+  /* Sync native select to current mode so it reads correctly before bridge enhances it */
+  var sel = document.getElementById('js-ui-mode');
+  if (sel) sel.value = document.body.dataset.aesthetic || 'instrument';
+  if (sel) sel.addEventListener('change', function () {
+    document.body.dataset.aesthetic = sel.value;
+    try { localStorage.setItem('depth-ui-mode', sel.value); } catch (e) {}
+  });
 }());
 </script>
 <script type="module">
@@ -575,12 +541,11 @@ const stage = document.getElementById('js-stage');
 const dock  = document.getElementById('js-dock');
 
 // ── State ─────────────────────────────────────────────────────────────────
-const _VALID_MODES = new Set(['parallax', 'depth', 'cloud', 'xr', 'diff']);
+const _VALID_MODES = new Set(['parallax', 'depth', 'cloud', 'diff']);
 const _savedMode = localStorage.getItem('viewer-mode');
 let mode    = (_savedMode && _VALID_MODES.has(_savedMode)) ? _savedMode : 'parallax';
 if (mode === 'diff' && !ev.has_motion_diff) mode = 'parallax';
 let cleanup = null;   // current mode cleanup fn
-let xrBanner = null;  // auto-XR banner element
 
 // ── Dock interaction ──────────────────────────────────────────────────────
 function updateDock() {
@@ -602,31 +567,9 @@ function switchMode(newMode) {
   mode = newMode;
   localStorage.setItem('viewer-mode', mode);
   updateDock();
-  const mounter = { parallax: mountParallax, depth: mountDepth, cloud: mountCloud, xr: mountXr, diff: mountDiff }[mode];
+  const mounter = { parallax: mountParallax, depth: mountDepth, cloud: mountCloud, diff: mountDiff }[mode];
   if (mounter) mounter().then(function(fn) { cleanup = fn || null; });
 }
-
-// ── Auto-XR detection ────────────────────────────────────────────────────
-if (navigator.xr) {
-  const ua = navigator.userAgent || '';
-  const likelyHeadset = /OculusBrowser|Quest|Pico|VisionOS|Wolvic/i.test(ua);
-  const check = likelyHeadset
-    ? Promise.resolve(true)
-    : navigator.xr.isSessionSupported('immersive-vr').catch(() => false);
-  check.then(function(ok) {
-    if (!ok || mode === 'xr') return;
-    xrBanner = document.createElement('div');
-    xrBanner.className = 'dock__auto mono';
-    xrBanner.innerHTML =
-      'XR headset detected &mdash; ' +
-      '<button class="btn btn--primary" id="js-xr-enter" style="padding:5px 10px;font-size:12px">Enter</button>' +
-      '<button class="btn btn--ghost" id="js-xr-dismiss" style="padding:5px 10px;font-size:12px">Dismiss</button>';
-    dock.appendChild(xrBanner);
-    xrBanner.querySelector('#js-xr-enter').onclick    = function() { dismissBanner(); switchMode('xr'); };
-    xrBanner.querySelector('#js-xr-dismiss').onclick  = dismissBanner;
-  });
-}
-function dismissBanner() { if (xrBanner) { xrBanner.remove(); xrBanner = null; } }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function mkCorner(pos, html) {
@@ -953,6 +896,9 @@ async function mountDepth() {
 }
 
 // ── Mode: Point cloud (Three.js + PLYLoader, lazy-loaded) ─────────────────
+// When the XR bridge has an active session, Cloud becomes volumetric:
+// the renderer is built with alpha + transparent clear, then handed to
+// renderer.xr.setSession so frames are driven by the headset pose.
 async function mountCloud() {
   if (!ev.has_ply) {
     stage.innerHTML = '<div class="stage-msg mono">No point cloud for this event<br><span style="color:var(--fg-faint);font-size:11px">depth pipeline did not produce a .ply file</span></div>';
@@ -981,12 +927,18 @@ async function mountCloud() {
 
   stage.innerHTML = '';
 
-  const renderer = new T.WebGLRenderer({ antialias: true });
+  const xrActive = !!(window.DepthXR && DepthXR.isInSession);
+  const renderer = new T.WebGLRenderer({ antialias: true, alpha: xrActive });
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
-  renderer.setClearColor(0x0a0a10, 1);
+  renderer.setClearColor(xrActive ? 0x000000 : 0x0a0a10, xrActive ? 0 : 1);
   renderer.setSize(stage.clientWidth, stage.clientHeight);
   renderer.domElement.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
   stage.appendChild(renderer.domElement);
+
+  if (xrActive && window.DepthXR && DepthXR.session) {
+    renderer.xr.enabled = true;
+    try { renderer.xr.setSession(DepthXR.session); } catch (e) { console.warn('XR attach failed', e); }
+  }
 
   const scene  = new T.Scene();
   const camera = new T.PerspectiveCamera(60, stage.clientWidth / stage.clientHeight, 0.01, 500);
@@ -995,6 +947,7 @@ async function mountCloud() {
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
+  if (xrActive) controls.enabled = false;
 
   const tl  = mkCorner('tl', '<span class="dot-live"></span>POINT CLOUD · orbit');
   const hud = document.createElement('div');
@@ -1042,9 +995,8 @@ async function mountCloud() {
     }
   );
 
-  let animId;
-  function animate() { animId = requestAnimationFrame(animate); controls.update(); renderer.render(scene, camera); }
-  animate();
+  function animate() { controls.update(); renderer.render(scene, camera); }
+  renderer.setAnimationLoop(animate);
 
   const ro = new ResizeObserver(function() {
     const w = stage.clientWidth, h = stage.clientHeight;
@@ -1055,126 +1007,11 @@ async function mountCloud() {
   ro.observe(stage);
 
   return function() {
-    cancelAnimationFrame(animId);
+    renderer.setAnimationLoop(null);
     controls.dispose();
     renderer.dispose();
     ro.disconnect();
   };
-}
-
-// ── Mode: XR ─────────────────────────────────────────────────────────────
-async function mountXr() {
-  const url    = window.location.href;
-  const isHttp = location.protocol !== 'https:';
-
-  // Check XR support
-  let vrOk = false, arOk = false;
-  if (navigator.xr) {
-    try { vrOk = await navigator.xr.isSessionSupported('immersive-vr'); } catch(_) {}
-    try { arOk = await navigator.xr.isSessionSupported('immersive-ar'); } catch(_) {}
-  }
-  const ua      = navigator.userAgent || '';
-  const headset = /OculusBrowser|Quest|Pico|VisionOS|Wolvic/i.test(ua) || vrOk || arOk;
-  // WebXR requires HTTPS — detect headset on plain HTTP so we can explain why VR is disabled
-  const httpsNeeded = headset && !vrOk && !arOk && isHttp;
-  // Safe display of current URL for the HTTPS hint — include search so ?headset=1 is preserved
-  const safeUrl = (location.host + location.pathname + location.search)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
-  // Simple seeded QR-like grid (same approach as design reference)
-  function fauxQR(data, size) {
-    const N = 25;
-    let s = (data||'').split('').reduce(function(a,c){return a+c.charCodeAt(0);},0);
-    function r(){ s=(s*9301+49297)%233280; return s/233280; }
-    const grid = Array.from({length:N}, function() {
-      return Array.from({length:N}, function(){ return r()>0.55?1:0; });
-    });
-    // Finder patterns
-    [[0,0],[0,N-7],[N-7,0]].forEach(function(ref) {
-      const ox=ref[0], oy=ref[1];
-      for(let y=0;y<7;y++) for(let x=0;x<7;x++){
-        grid[oy+y][ox+x]=(x===0||x===6||y===0||y===6||( x>=2&&x<=4&&y>=2&&y<=4))?1:0;
-      }
-    });
-    const cell = (size/N).toFixed(3);
-    let rects = '';
-    grid.forEach(function(row,y){row.forEach(function(v,x){
-      if(v) rects+=`<rect x="${(x*size/N).toFixed(2)}" y="${(y*size/N).toFixed(2)}" width="${cell}" height="${cell}"/>`;
-    });});
-    return `<svg viewBox="0 0 ${size} ${size}" class="xr__qrsvg" shape-rendering="crispEdges" fill="currentColor">${rects}</svg>`;
-  }
-
-  stage.innerHTML = `
-    <div class="xr-wrap">
-      <div class="xr">
-        <div>
-          <div class="xr__glyph" aria-hidden>
-            <svg viewBox="0 0 120 60" width="140" height="70">
-              <path d="M10 30 Q10 10 30 10 H90 Q110 10 110 30 Q110 50 90 50 H30 Q10 50 10 30 Z"
-                fill="none" stroke="currentColor" stroke-width="1.5"/>
-              <circle cx="40" cy="30" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/>
-              <circle cx="80" cy="30" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/>
-              <line x1="50" y1="30" x2="70" y2="30" stroke="currentColor" stroke-width="1.5"/>
-            </svg>
-          </div>
-          <div class="xr__title">${headset ? 'Headset detected' : 'Open in a headset'}</div>
-          <div class="xr__sub">
-            ${httpsNeeded
-              ? 'WebXR requires a secure connection. Open this page over HTTPS to enable immersive VR.'
-              : headset
-                ? 'Step into the scene &mdash; the depth map becomes a real volumetric proxy you can walk around.'
-                : 'Open this URL on a Quest, Vision Pro, or Pico headset to enter the scene in immersive 3D.'}
-          </div>
-          ${httpsNeeded ? `<div class="xr__sub mono" style="font-size:11px;margin-top:-8px;margin-bottom:18px;background:var(--accent-bg);border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px;color:var(--fg-mid)">Try: <b style="color:var(--accent)">https://</b>${safeUrl}</div>` : ''}
-          <div class="xr__btns">
-            <button class="btn btn--primary" id="js-xr-vr" ${!vrOk ? 'disabled' : ''}>
-              ${vrOk ? 'Enter VR' : httpsNeeded ? 'VR requires HTTPS' : 'VR not available'}
-            </button>
-            <button class="btn" id="js-xr-ar" ${!arOk ? 'disabled' : ''}>
-              ${arOk ? 'Enter AR (passthrough)' : 'AR not available'}
-            </button>
-            ${ev.has_ply ? `<a href="/events/${ev.event_id}/pointcloud.ply" class="btn btn--ghost" download>Download .ply</a>` : ''}
-          </div>
-          <div class="xr__support mono">
-            <span>WebXR VR: <b style="color:${vrOk?'oklch(0.78 0.13 145)':'var(--fg-dim)'}">${vrOk?'available':'unavailable'}</b></span>
-            <span>WebXR AR: <b style="color:${arOk?'oklch(0.78 0.13 145)':'var(--fg-dim)'}">${arOk?'available':'unavailable'}</b></span>
-          </div>
-        </div>
-        <div class="xr__qr">
-          <div class="label-xs">Scan from headset</div>
-          <div class="xr__qrbox">${fauxQR(url, 156)}</div>
-          <div class="xr__url mono">${url}</div>
-        </div>
-      </div>
-    </div>`;
-
-  // VR session handler
-  const vrBtn = stage.querySelector('#js-xr-vr');
-  if (vrOk && vrBtn) {
-    vrBtn.onclick = async function() {
-      try {
-        const session = await navigator.xr.requestSession('immersive-vr');
-        vrBtn.textContent = 'In VR session';
-        session.addEventListener('end', function(){ vrBtn.textContent = 'Enter VR'; });
-      } catch(e) {
-        console.error('VR session failed', e);
-      }
-    };
-  }
-  const arBtn = stage.querySelector('#js-xr-ar');
-  if (arOk && arBtn) {
-    arBtn.onclick = async function() {
-      try {
-        const session = await navigator.xr.requestSession('immersive-ar');
-        arBtn.textContent = 'In AR session';
-        session.addEventListener('end', function(){ arBtn.textContent = 'Enter AR (passthrough)'; });
-      } catch(e) {
-        console.error('AR session failed', e);
-      }
-    };
-  }
-
-  return null;  // no animation loop to clean up
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
@@ -1190,6 +1027,26 @@ window.addEventListener('pageshow', function(e) {
     switchMode(mode);
   }
 });
+
+// ── XR bridge hook ────────────────────────────────────────────────────────
+// When AR/VR enters or exits, re-mount the current mode so Cloud rebuilds
+// with the right alpha + XR layer wiring. Parallax / Depth become flat
+// DOM-overlay panels floating over passthrough.
+function _remountOnXrChange() {
+  if (cleanup) { try { cleanup(); } catch(_) {} cleanup = null; }
+  stage.innerHTML = '';
+  const mounter = { parallax: mountParallax, depth: mountDepth, cloud: mountCloud, diff: mountDiff }[mode];
+  if (mounter) mounter().then(function(fn) { cleanup = fn || null; });
+}
+function _initBridge() {
+  if (!window.DepthXR) return;
+  DepthXR.init({
+    onEnter: function () { _remountOnXrChange(); },
+    onExit:  function () { _remountOnXrChange(); },
+  });
+}
+// xr-bridge.js loads synchronously before this module script runs,
+// but the module is deferred — so the bridge is guaranteed to be ready.
+_initBridge();
 </script>
-</body>
-</html>
+{% endblock %}
