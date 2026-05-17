@@ -238,14 +238,7 @@ label { color: var(--fg-mid); font-size: 12px; letter-spacing: 0.04em; text-tran
     var _m = localStorage.getItem('depth-ui-mode');
     if (_m) document.body.dataset.aesthetic = _m;
   } catch (e) {}
-  var sel = document.getElementById('js-ui-mode');
-  if (sel) {
-    sel.value = document.body.dataset.aesthetic || 'instrument';
-    sel.addEventListener('change', function () {
-      document.body.dataset.aesthetic = sel.value;
-      try { localStorage.setItem('depth-ui-mode', sel.value); } catch (e) {}
-    });
-  }
+  /* Select sync happens in the main script below after the DOM is parsed */
 }());
 </script>
 <div class="page">

@@ -58,13 +58,10 @@
     sessionType: null,   // 'immersive-ar' | 'immersive-vr'
     onEnter:  null,
     onExit:   null,
-    want3D:   false,
-    threeBuilder: null,
     supportAR: false,
     supportVR: false,
     panelOpacity: parseInt(ls(K.panelOp, '70'), 10),
     forceReticle: ls(K.reticle, '') === '1',
-    bar3DLast: 0,
   };
 
   /* ── Headset visual flag (passthrough preview without a real session) ── */
@@ -392,7 +389,7 @@
     var selector = 'button:not(:disabled),a[href],select:not(:disabled),input:not(:disabled),[role="button"],[tabindex]:not([tabindex="-1"]),.chip--btn,.dock__pill,.xrsel';
     document.addEventListener('pointermove', function (e) {
       if (!(state.session || state.forceReticle || previewOn)) return;
-      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var el = e.target;
       if (!el) { hideReticle(); return; }
       var hit = el.closest(selector);
       if (!hit || hit.disabled) { hideReticle(); return; }
@@ -517,7 +514,7 @@
     /* External code may set sel.value programmatically — sync our label. */
     sel.addEventListener('change', syncLabel);
     /* If options are added later (e.g. settings camera DB), refresh. */
-    new MutationObserver(syncLabel).observe(sel, { childList: true, subtree: true, attributes: true, attributeFilter: ['value'] });
+    new MutationObserver(syncLabel).observe(sel, { childList: true, subtree: true });
   }
 
   function autoEnhanceSelects(root) {
@@ -690,8 +687,6 @@
     opts = opts || {};
     state.onEnter = opts.onEnter || null;
     state.onExit  = opts.onExit  || null;
-    state.want3D  = !!opts.want3D;
-    state.threeBuilder = opts.threeBuilder || null;
 
     injectCSS();
     bindHoverGlow();
@@ -764,7 +759,5 @@
     get isPreview()   { return previewOn; },
     get supportAR()   { return state.supportAR; },
     get supportVR()   { return state.supportVR; },
-    /* Allow pages to listen for the bar showing/hiding for layout fixes */
-    onBarVisibleChange: function (cb) { state._barCb = cb; },
   };
 }());
