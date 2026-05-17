@@ -439,23 +439,26 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 [data-aesthetic="glass"][data-headset="1"] .dock { background: rgba(6, 18, 36, 0.55); }
 [data-aesthetic="glass"][data-headset="1"] .dslider { background: transparent !important; }
 
-/* UI Mode select (compact version for dock) */
-.ui-mode__sel {
-  appearance: none; -webkit-appearance: none;
+/* UI Mode cycle button (replaces <select> — more reliable in VR browsers) */
+.ui-mode__btn {
   font: inherit; font-family: var(--font-mono); font-size: 11px;
   letter-spacing: 0.04em; text-transform: uppercase;
-  padding: 6px 22px 6px 10px; line-height: 1;
-  background: var(--bg-1) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'><path fill='%2389a' d='M0 0h8L4 6z'/></svg>") no-repeat right 8px center;
+  padding: 6px 10px; line-height: 1;
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--bg-1);
   color: var(--fg-mid); border: 1px solid var(--line); border-radius: var(--radius);
   cursor: pointer; transition: border-color 120ms, color 120ms;
+  white-space: nowrap;
 }
-.ui-mode__sel:hover, .ui-mode__sel:focus { color: var(--fg); border-color: var(--accent); outline: none; }
-[data-aesthetic="glass"] .ui-mode__sel {
-  background-color: rgba(140, 215, 255, 0.06);
+.ui-mode__btn:hover, .ui-mode__btn:focus { color: var(--fg); border-color: var(--accent); outline: none; }
+.ui-mode__btn__icon { font-size: 13px; opacity: 0.5; transition: opacity 120ms; line-height: 1; }
+.ui-mode__btn:hover .ui-mode__btn__icon { opacity: 1; }
+[data-aesthetic="glass"] .ui-mode__btn {
+  background: rgba(140, 215, 255, 0.06);
   border-color: rgba(140, 215, 255, 0.28);
   color: var(--accent);
 }
-[data-aesthetic="glass"] .ui-mode__sel:hover { box-shadow: 0 0 14px -3px rgba(140, 215, 255, 0.5); }
+[data-aesthetic="glass"] .ui-mode__btn:hover { box-shadow: 0 0 14px -3px rgba(140, 215, 255, 0.5); }
 </style>
 
 <!-- Three.js importmap — loaded lazily only when Cloud mode is activated -->
@@ -520,13 +523,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     <div class="dock__actions">
       <a href="/" class="btn btn--ghost">&#x2039; Gallery</a>
       {% if event.has_ply %}<a href="/events/{{ event_id }}/pointcloud.ply" class="btn" download="{{ event_id }}.ply">PLY</a>{% endif %}
-      <select id="js-ui-mode" class="ui-mode__sel" title="UI mode">
-        <option value="glass">Glass</option>
-        <option value="instrument">Instrument</option>
-        <option value="cinematic">Cinematic</option>
-        <option value="brutalist">Brutalist</option>
-        <option value="soft">Soft</option>
-      </select>
+      <button id="js-ui-mode" class="ui-mode__btn" title="Cycle UI mode">
+        <span id="js-ui-mode-label">INSTRUMENT</span>
+        <span class="ui-mode__btn__icon" aria-hidden>↻</span>
+      </button>
     </div>
     <!-- XR auto-detect banner inserted by JS -->
   </div>
@@ -539,7 +539,8 @@ window.VIEWER_EVENT = {{ event | tojson }};
 <script>
 /* ── Apply persisted UI mode + headset detection ─────────────────────────── */
 (function () {
-  var _UI_KEY = 'depth-ui-mode';
+  var _UI_KEY   = 'depth-ui-mode';
+  var _UI_MODES = ['glass', 'instrument', 'cinematic', 'brutalist', 'soft'];
   try {
     var _saved = localStorage.getItem(_UI_KEY);
     if (_saved) document.body.dataset.aesthetic = _saved;
@@ -548,14 +549,20 @@ window.VIEWER_EVENT = {{ event | tojson }};
       /[?&]headset=1\b/.test(location.search)) {
     document.body.dataset.headset = '1';
   }
-  /* Sync picker to current mode */
-  var sel = document.getElementById('js-ui-mode');
-  if (sel) sel.value = document.body.dataset.aesthetic || 'instrument';
-  /* Handle picker changes */
-  if (sel) {
-    sel.addEventListener('change', function () {
-      document.body.dataset.aesthetic = sel.value;
-      try { localStorage.setItem(_UI_KEY, sel.value); } catch (e) {}
+  /* Sync button label to current mode */
+  var btn = document.getElementById('js-ui-mode');
+  var lbl = document.getElementById('js-ui-mode-label');
+  function _syncLabel(m) { if (lbl) lbl.textContent = (m || 'instrument').toUpperCase(); }
+  _syncLabel(document.body.dataset.aesthetic);
+  /* Handle click — cycles through modes in order */
+  if (btn) {
+    btn.addEventListener('click', function () {
+      var cur  = document.body.dataset.aesthetic || 'instrument';
+      var idx  = _UI_MODES.indexOf(cur);
+      var next = _UI_MODES[(idx + 1) % _UI_MODES.length];
+      document.body.dataset.aesthetic = next;
+      _syncLabel(next);
+      try { localStorage.setItem(_UI_KEY, next); } catch (e) {}
     });
   }
 }());
@@ -1057,7 +1064,8 @@ async function mountCloud() {
 
 // ── Mode: XR ─────────────────────────────────────────────────────────────
 async function mountXr() {
-  const url = window.location.href;
+  const url    = window.location.href;
+  const isHttp = location.protocol !== 'https:';
 
   // Check XR support
   let vrOk = false, arOk = false;
@@ -1065,8 +1073,13 @@ async function mountXr() {
     try { vrOk = await navigator.xr.isSessionSupported('immersive-vr'); } catch(_) {}
     try { arOk = await navigator.xr.isSessionSupported('immersive-ar'); } catch(_) {}
   }
-  const ua = navigator.userAgent || '';
+  const ua      = navigator.userAgent || '';
   const headset = /OculusBrowser|Quest|Pico|VisionOS|Wolvic/i.test(ua) || vrOk || arOk;
+  // WebXR requires HTTPS — detect headset on plain HTTP so we can explain why VR is disabled
+  const httpsNeeded = headset && !vrOk && !arOk && isHttp;
+  // Safe display of current URL for the HTTPS hint — include search so ?headset=1 is preserved
+  const safeUrl = (location.host + location.pathname + location.search)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
   // Simple seeded QR-like grid (same approach as design reference)
   function fauxQR(data, size) {
@@ -1106,13 +1119,16 @@ async function mountXr() {
           </div>
           <div class="xr__title">${headset ? 'Headset detected' : 'Open in a headset'}</div>
           <div class="xr__sub">
-            ${headset
-              ? 'Step into the scene &mdash; the depth map becomes a real volumetric proxy you can walk around.'
-              : 'Open this URL on a Quest, Vision Pro, or Pico headset to enter the scene in immersive 3D.'}
+            ${httpsNeeded
+              ? 'WebXR requires a secure connection. Open this page over HTTPS to enable immersive VR.'
+              : headset
+                ? 'Step into the scene &mdash; the depth map becomes a real volumetric proxy you can walk around.'
+                : 'Open this URL on a Quest, Vision Pro, or Pico headset to enter the scene in immersive 3D.'}
           </div>
+          ${httpsNeeded ? `<div class="xr__sub mono" style="font-size:11px;margin-top:-8px;margin-bottom:18px;background:var(--accent-bg);border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px;color:var(--fg-mid)">Try: <b style="color:var(--accent)">https://</b>${safeUrl}</div>` : ''}
           <div class="xr__btns">
             <button class="btn btn--primary" id="js-xr-vr" ${!vrOk ? 'disabled' : ''}>
-              ${vrOk ? 'Enter VR' : 'VR not available'}
+              ${vrOk ? 'Enter VR' : httpsNeeded ? 'VR requires HTTPS' : 'VR not available'}
             </button>
             <button class="btn" id="js-xr-ar" ${!arOk ? 'disabled' : ''}>
               ${arOk ? 'Enter AR (passthrough)' : 'AR not available'}
