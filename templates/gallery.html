@@ -592,8 +592,9 @@ img { display: block; }
 <script>
 /* ── Apply persisted UI mode immediately (before first render) ─────────────── */
 (function () {
+  var _UI_KEY = 'depth-ui-mode';
   try {
-    var _m = localStorage.getItem('depth-ui-mode');
+    var _m = localStorage.getItem(_UI_KEY);
     if (_m) document.body.dataset.aesthetic = _m;
   } catch (e) {}
   if (/OculusBrowser|Quest|Pico|VisionOS|Wolvic/i.test(navigator.userAgent || '') ||

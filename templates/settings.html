@@ -471,13 +471,14 @@ label { color: var(--fg-mid); font-size: 12px; letter-spacing: 0.04em; text-tran
 
 // ── UI Mode picker ────────────────────────────────────────────────────────
 (function () {
+  var _UI_KEY = 'depth-ui-mode';
   var sel = document.getElementById('js-ui-mode');
   if (!sel) return;
   // Sync to current body aesthetic
   sel.value = document.body.dataset.aesthetic || 'instrument';
   sel.addEventListener('change', function () {
     document.body.dataset.aesthetic = sel.value;
-    try { localStorage.setItem('depth-ui-mode', sel.value); } catch (e) {}
+    try { localStorage.setItem(_UI_KEY, sel.value); } catch (e) {}
   });
 }());
 
