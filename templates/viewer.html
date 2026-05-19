@@ -938,7 +938,10 @@ async function mountCloud() {
   if (xrActive && window.DepthXR && DepthXR.session) {
     renderer.xr.enabled = true;
     DepthXR.claimXRLayer(); // prevent fallback canvas from overwriting Three.js's XRWebGLLayer
-    try { await renderer.xr.setSession(DepthXR.session); } catch (e) { console.warn('XR attach failed', e); }
+    try { await renderer.xr.setSession(DepthXR.session); } catch (e) {
+      console.warn('XR attach failed', e);
+      DepthXR.exitImmersive();
+    }
   }
 
   const scene  = new T.Scene();
