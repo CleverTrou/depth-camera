@@ -613,6 +613,7 @@
         if (gl && gl.makeXRCompatible) {
           Promise.resolve(gl.makeXRCompatible()).then(function () {
             if (state.session !== session) return; // session changed
+            if (state._layerClaimed) return;       // page renderer claimed the layer
             session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
           }).catch(function (e) { console.warn('XR baseLayer setup failed', e); });
         }
@@ -656,6 +657,7 @@
   function onSessionEnd() {
     state.session = null;
     state.sessionType = null;
+    state._layerClaimed = false;
     document.body.removeAttribute('data-xr-active');
     state.pillEl && state.pillEl.classList.remove('is-on');
     if (state.fallbackCanvas) {
@@ -752,6 +754,7 @@
     init: init,
     enterImmersive: enterImmersive,
     exitImmersive:  exitImmersive,
+    claimXRLayer:   function() { state._layerClaimed = true; },
     get isInSession() { return !!state.session; },
     get session()     { return state.session; },
     get sessionType() { return state.sessionType; },

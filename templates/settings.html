@@ -476,9 +476,6 @@ label { color: var(--fg-mid); font-size: 12px; letter-spacing: 0.04em; text-tran
   });
 }());
 
-// Bridge builds the slide-down bar, enhances selects, and injects XR CSS
-if (window.DepthXR) DepthXR.init();
-
 // ── Save button feedback ──────────────────────────────────────────────────
 document.querySelector('form').addEventListener('submit', function() {
   var btn  = document.getElementById('save-btn');
@@ -701,4 +698,10 @@ function toggleMonitor(action) {
 }
 </script>
 {% endblock %}
-{% block scripts %}{% endblock %}
+{% block scripts %}
+<script>
+// Bridge builds the slide-down bar, enhances selects, and injects XR CSS.
+// Must run after xr-bridge.js is loaded (base.html loads it before this block).
+if (window.DepthXR) DepthXR.init();
+</script>
+{% endblock %}
