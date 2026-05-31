@@ -36,7 +36,7 @@ from flask import (
 
 DEFAULT_CONFIG = {
     "gallery": {
-        "host": "0.0.0.0",
+        "host": "::",
         "port": 8080,
         "pin": "",
     },
@@ -624,11 +624,19 @@ def main():
     log.info(f"  PIN auth:  {'enabled' if pin else 'disabled (set gallery.pin in config.yaml)'}")
     log.info("=" * 50)
 
-    app.run(
-        host=gallery_cfg["host"],
-        port=gallery_cfg["port"],
-        debug=False,
-    )
+    try:
+        app.run(
+            host=gallery_cfg["host"],
+            port=gallery_cfg["port"],
+            debug=False,
+        )
+    except OSError as exc:
+        # Fall back to IPv4 if the host has IPv6 disabled and :: can't bind.
+        if gallery_cfg["host"] == "::":
+            log.warning("Failed to bind IPv6 (::), falling back to 0.0.0.0: %s", exc)
+            app.run(host="0.0.0.0", port=gallery_cfg["port"], debug=False)
+        else:
+            raise
 
 
 if __name__ == "__main__":

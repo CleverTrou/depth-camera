@@ -50,7 +50,7 @@ DEFAULT_CONFIG = {
         "segment_seconds": 2,
     },
     "relay": {
-        "host": "0.0.0.0",
+        "host": "::",
         "port": 9090,
         "lookback_s": 5,
         "snapshot_quality": 2,
@@ -278,7 +278,15 @@ def main():
     from depth import load_model
     load_model()
 
-    app.run(host=relay["host"], port=relay["port"], debug=False)
+    try:
+        app.run(host=relay["host"], port=relay["port"], debug=False)
+    except OSError as exc:
+        # Fall back to IPv4 if the host has IPv6 disabled and :: can't bind.
+        if relay["host"] == "::":
+            log.warning("Failed to bind IPv6 (::), falling back to 0.0.0.0: %s", exc)
+            app.run(host="0.0.0.0", port=relay["port"], debug=False)
+        else:
+            raise
 
 
 if __name__ == "__main__":
