@@ -36,7 +36,7 @@ from flask import (
 
 DEFAULT_CONFIG = {
     "gallery": {
-        "host": "0.0.0.0",
+        "host": "::",
         "port": 8080,
         "pin": "",
     },

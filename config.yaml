@@ -24,7 +24,7 @@ ring_buffer:
 
 relay:
   # IFTTT webhook receiver
-  host: "0.0.0.0"
+  host: "::"
   port: 9090
   lookback_s: 5              # Seconds into the past for IFTTT triggers
   snapshot_quality: 2        # ffmpeg -q:v (1=best, 31=worst)
@@ -80,7 +80,7 @@ depth_model:
 
 gallery:
   # Local web gallery
-  host: "0.0.0.0"
+  host: "::"
   port: 8080
   # Optional PIN lock for the gallery (recommended — camera images are served
   # unauthenticated without it). Set a 6-character value, e.g. "482916".

@@ -50,7 +50,7 @@ DEFAULT_CONFIG = {
         "segment_seconds": 2,
     },
     "relay": {
-        "host": "0.0.0.0",
+        "host": "::",
         "port": 9090,
         "lookback_s": 5,
         "snapshot_quality": 2,
