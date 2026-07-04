@@ -68,6 +68,7 @@ DEFAULT_CONFIG = {
     "notifications": {
         "webhook_heartbeat_url": "",
         "ntfy_topic_url": "",
+        "heartbeat_interval_s": 43200,  # 12 hours
     },
 }
 
@@ -108,6 +109,41 @@ log = logging.getLogger("relay")
 
 app = Flask(__name__)
 _config = {}
+
+
+def _get_heartbeat_interval():
+    """Parse notifications.heartbeat_interval_s, falling back to 12h on any bad value.
+
+    This comes straight from user-edited YAML — a stray "0", a negative number,
+    or a typo'd string would otherwise crash the background thread (ValueError/
+    TypeError from time.sleep) or spin it at 100% CPU (interval <= 0).
+    """
+    default = DEFAULT_CONFIG["notifications"]["heartbeat_interval_s"]
+    raw = _config.get("notifications", {}).get("heartbeat_interval_s", default)
+    try:
+        interval = int(raw)
+        if interval <= 0:
+            raise ValueError("must be positive")
+        return interval
+    except (TypeError, ValueError) as e:
+        log.warning(f"Invalid heartbeat_interval_s ({raw!r}), falling back to {default}s: {e}")
+        return default
+
+
+def _format_interval(seconds):
+    """Human-readable interval for log lines — avoids a confusing 'every 0h' for sub-hour values."""
+    return f"{seconds // 3600}h" if seconds >= 3600 else f"{seconds}s"
+
+
+def _heartbeat_loop():
+    """Ping the relay healthcheck on a fixed interval, independent of webhook traffic."""
+    while True:
+        url = _config.get("notifications", {}).get("webhook_heartbeat_url") or None
+        interval = _get_heartbeat_interval()
+        if url:
+            log.info(f"Heartbeat ping (next in {_format_interval(interval)})")
+            ping_healthcheck(url)
+        time.sleep(interval)
 
 
 def _capture_and_process(source, event_type, lookback_override=None):
@@ -268,15 +304,20 @@ def main():
 
     log.info("=" * 55)
     log.info("Depth Camera — IFTTT Webhook Relay")
+    hb_interval = _get_heartbeat_interval()
+
     log.info(f"  Listening:  :{relay['port']}/ifttt")
     log.info(f"  Ring buf:   {ring['dir']}")
     log.info(f"  Lookback:   {relay['lookback_s']}s")
     log.info(f"  Data dir:   {_config['pipeline']['data_dir']}")
+    log.info(f"  Heartbeat:  every {_format_interval(hb_interval)}")
     log.info("=" * 55)
 
     # Pre-load depth model at startup so first event isn't slow
     from depth import load_model
     load_model()
+
+    threading.Thread(target=_heartbeat_loop, daemon=True, name="heartbeat").start()
 
     try:
         app.run(host=relay["host"], port=relay["port"], debug=False)
