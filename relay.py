@@ -68,6 +68,7 @@ DEFAULT_CONFIG = {
     "notifications": {
         "webhook_heartbeat_url": "",
         "ntfy_topic_url": "",
+        "heartbeat_interval_s": 43200,  # 12 hours
     },
 }
 
@@ -108,6 +109,17 @@ log = logging.getLogger("relay")
 
 app = Flask(__name__)
 _config = {}
+
+
+def _heartbeat_loop():
+    """Ping the relay healthcheck on a fixed interval, independent of webhook traffic."""
+    while True:
+        url = _config.get("notifications", {}).get("webhook_heartbeat_url") or None
+        interval = _config.get("notifications", {}).get("heartbeat_interval_s", 43200)
+        if url:
+            log.info(f"Heartbeat ping (next in {interval // 3600}h)")
+            ping_healthcheck(url)
+        time.sleep(interval)
 
 
 def _capture_and_process(source, event_type, lookback_override=None):
@@ -268,15 +280,21 @@ def main():
 
     log.info("=" * 55)
     log.info("Depth Camera — IFTTT Webhook Relay")
+    notif = _config.get("notifications", {})
+    hb_interval = notif.get("heartbeat_interval_s", 43200)
+
     log.info(f"  Listening:  :{relay['port']}/ifttt")
     log.info(f"  Ring buf:   {ring['dir']}")
     log.info(f"  Lookback:   {relay['lookback_s']}s")
     log.info(f"  Data dir:   {_config['pipeline']['data_dir']}")
+    log.info(f"  Heartbeat:  every {hb_interval // 3600}h")
     log.info("=" * 55)
 
     # Pre-load depth model at startup so first event isn't slow
     from depth import load_model
     load_model()
+
+    threading.Thread(target=_heartbeat_loop, daemon=True, name="heartbeat").start()
 
     try:
         app.run(host=relay["host"], port=relay["port"], debug=False)

@@ -73,7 +73,7 @@ IFTTT reaches the Pi via Tailscale Funnel (HTTPS, no port forwarding).
 
 Two channels, both optional and fail-silently (see `notifications.py`):
 
-- **Healthchecks.io** — dead-man's-switch pings. `ring_buffer.py` pings `notifications.ring_buffer_heartbeat_url` every ~60s while segments are flowing; `relay.py` pings `notifications.webhook_heartbeat_url` on each `/ifttt` POST. Both URLs come from env vars (`HEALTHCHECK_RING_BUFFER_URL`, `HEALTHCHECK_WEBHOOK_URL`) set in `/etc/depth-camera.env`. Committed `config.yaml` has them empty so the URLs stay out of git.
+- **Healthchecks.io** — dead-man's-switch pings. `ring_buffer.py` pings `notifications.ring_buffer_heartbeat_url` every ~60s while segments are flowing. `relay.py` pings `notifications.webhook_heartbeat_url` two ways: immediately on each `/ifttt` POST, and on a fixed `notifications.heartbeat_interval_s` schedule (default 12h) independent of webhook traffic — this second path is a relay-process liveness check, so a genuinely quiet night (no detections) doesn't get misread as the relay being down. Both heartbeat URLs come from env vars (`HEALTHCHECK_RING_BUFFER_URL`, `HEALTHCHECK_WEBHOOK_URL`) set in `/etc/depth-camera.env`. Committed `config.yaml` has them empty so the URLs stay out of git.
 - **ntfy** — active error pushes. Topic URL comes from the `NTFY_TOPIC_ALERTS` env var (set in `/etc/ntfy.env` on the Pi). Falls back to `notifications.ntfy_topic_url` in `config.yaml`, which is intentionally empty in the committed copy. The topic value is never in any tracked file — keeps it out of GitHub.
 
 ## Coexistence

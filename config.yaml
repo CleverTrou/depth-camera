@@ -93,11 +93,15 @@ notifications:
   #
   # ring_buffer: pinged every 60s while segments are flowing.
   #   Suggested healthchecks config: period=1m, grace=2m.
-  # webhook: pinged on every incoming /ifttt POST. If Aqara detects nothing
-  #   for a long time, this will go silent and alert you.
-  #   Suggested healthchecks config: period=24h, grace=12h.
+  # webhook: pinged immediately on every incoming /ifttt POST, AND on a fixed
+  #   schedule (heartbeat_interval_s below) regardless of webhook traffic.
+  #   This is a relay-process liveness check, not a "did Aqara detect
+  #   anything" check — a genuinely quiet night no longer risks a false alert.
+  #   Suggested healthchecks config: period matching heartbeat_interval_s,
+  #   grace=heartbeat_interval_s/2 (defaults below: period=12h, grace=6h).
   ring_buffer_heartbeat_url: ""
   webhook_heartbeat_url: ""
+  heartbeat_interval_s: 43200  # 12 hours
 
   # Active error pushes. Pick any topic name on https://ntfy.sh/ (e.g.
   #   https://ntfy.sh/depth-camera-<random>) and subscribe to it
