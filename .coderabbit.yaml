@@ -15,6 +15,8 @@ reviews:
     drafts: false
     ignore_usernames:
       - "dependabot[bot]"
+      - "renovate[bot]"
+      - "github-actions[bot]"
 
   path_filters:
     - "!**/__pycache__/**"
