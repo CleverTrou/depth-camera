@@ -8,7 +8,7 @@ requests>=2.34.2
 # Depth estimation
 onnxruntime>=1.27.0          # Has ARM64 (aarch64) wheels on PyPI
 numpy>=2.4.4
-Pillow>=12.2.0
+Pillow>=12.3.0
 
 # Depth colormap visualization (optional — graceful fallback to grayscale)
 matplotlib>=3.11.0
