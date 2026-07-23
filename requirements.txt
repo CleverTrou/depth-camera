@@ -11,4 +11,4 @@ numpy>=2.5.0
 Pillow>=12.3.0
 
 # Depth colormap visualization (optional — graceful fallback to grayscale)
-matplotlib>=3.11.0
+matplotlib>=3.11.1
