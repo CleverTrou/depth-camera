@@ -100,8 +100,9 @@ def generate_colormap(
     output_path = Path(output_path)
 
     try:
-        import matplotlib.cm as cm
-        cmap = cm.get_cmap(colormap)
+        # cm.get_cmap() was removed in matplotlib 3.9; the registry replaces it
+        from matplotlib import colormaps
+        cmap = colormaps[colormap]
     except ImportError:
         # Fallback: simple grayscale if matplotlib isn't available
         gray = (depth * 255).astype(np.uint8)
