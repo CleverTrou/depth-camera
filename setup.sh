@@ -10,9 +10,15 @@
 #
 # Everything runs on the Pi. No VPS required.
 #
-# Usage:
+# Usage (install, and every upgrade after a git pull):
 #   chmod +x setup.sh
 #   sudo ./setup.sh
+#
+# Re-running is safe: it replaces code, templates, the shipped defaults
+# (config.yaml), and the unit files, and restarts services that are running.
+# It never touches your settings in /etc/depth-camera.yaml or the secrets in
+# /etc/depth-camera.env. For local changes to a unit, use
+# `sudo systemctl edit depth-<name>`: a drop-in survives re-runs.
 # =============================================================================
 
 set -euo pipefail
@@ -23,6 +29,10 @@ if [[ -z "$SERVICE_USER" ]]; then
     echo "Run with sudo: sudo ./setup.sh"
     exit 1
 fi
+
+# An existing ring-buffer unit means this run is an upgrade.
+FRESH_INSTALL=true
+[ -f /etc/systemd/system/depth-ring.service ] && FRESH_INSTALL=false
 
 echo "=========================================="
 echo "  Depth Camera — Pi Setup"
@@ -63,15 +73,37 @@ echo "  ✓ Python packages (including onnxruntime for ARM64)"
 echo ""
 echo "[3/5] Installing application..."
 INSTALL_DIR="/opt/depth-camera"
+OVERRIDES="/etc/depth-camera.yaml"
 mkdir -p "$INSTALL_DIR/templates"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cp "$SCRIPT_DIR"/*.py "$INSTALL_DIR/"
-cp "$SCRIPT_DIR"/templates/*.html "$INSTALL_DIR/templates/"
 
-if [ ! -f "$INSTALL_DIR/config.yaml" ]; then
-    cp "$SCRIPT_DIR/config.yaml" "$INSTALL_DIR/"
+# Your settings live in $OVERRIDES, which this script creates once and never
+# overwrites. Versions before it kept every setting in $INSTALL_DIR/config.yaml.
+# On the first run after such an install, carry over only the values that
+# differ from the new defaults, before the defaults below replace that file.
+# (A config.yaml with the "shipped defaults" banner is already new-style.)
+if [ ! -f "$OVERRIDES" ]; then
+    OLD="$INSTALL_DIR/config.yaml"
+    if [ -f "$OLD" ] && ! grep -q "Configuration: shipped defaults" "$OLD"; then
+        cp -p "$OLD" "$OLD.pre-overrides"
+        python3 "$SCRIPT_DIR/config.py" init "$OVERRIDES" --from "$OLD.pre-overrides" | sed 's/^/  /'
+        echo "  ✓ Old settings file kept as $OLD.pre-overrides"
+    else
+        python3 "$SCRIPT_DIR/config.py" init "$OVERRIDES" | sed 's/^/  /'
+    fi
+    # 0600: it can hold the gallery PIN. Owned by the service user so the
+    # gallery Settings page can write it.
+    chown "$SERVICE_USER:$SERVICE_USER" "$OVERRIDES"
+    chmod 600 "$OVERRIDES"
+else
+    echo "  ✓ $OVERRIDES already exists (not overwritten)"
 fi
+
+# Code, templates, and shipped defaults are replaced on every run.
+cp "$SCRIPT_DIR"/*.py "$INSTALL_DIR/"
+cp "$SCRIPT_DIR/config.yaml" "$INSTALL_DIR/"
+cp "$SCRIPT_DIR"/templates/*.html "$INSTALL_DIR/templates/"
 
 # Create environment file for secrets (not in the repo)
 ENV_FILE="/etc/depth-camera.env"
@@ -122,7 +154,7 @@ Type=simple
 User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
 EnvironmentFile=/etc/depth-camera.env
-ExecStart=/usr/bin/python3 ring_buffer.py --config config.yaml
+ExecStart=/usr/bin/python3 ring_buffer.py
 Restart=always
 RestartSec=5
 MemoryMax=100M
@@ -143,7 +175,8 @@ Type=simple
 User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
 EnvironmentFile=/etc/depth-camera.env
-ExecStart=/usr/bin/python3 relay.py --config config.yaml
+EnvironmentFile=-/etc/ntfy.env
+ExecStart=/usr/bin/python3 relay.py
 Restart=on-failure
 RestartSec=15
 MemoryMax=2G
@@ -162,7 +195,7 @@ After=network-online.target
 Type=simple
 User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
-ExecStart=/usr/bin/python3 server.py --config config.yaml
+ExecStart=/usr/bin/python3 server.py
 Restart=on-failure
 RestartSec=10
 MemoryMax=200M
@@ -183,7 +216,8 @@ Type=simple
 User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
 EnvironmentFile=/etc/depth-camera.env
-ExecStart=/usr/bin/python3 monitor.py --config config.yaml
+EnvironmentFile=-/etc/ntfy.env
+ExecStart=/usr/bin/python3 monitor.py
 Restart=on-failure
 RestartSec=15
 MemoryMax=2G
@@ -193,12 +227,26 @@ WantedBy=multi-user.target
 UNIT
 
 systemctl daemon-reload
-systemctl enable depth-ring depth-relay depth-gallery
 
-echo "  ✓ depth-ring.service     — enabled (ring buffer)"
-echo "  ✓ depth-relay.service    — enabled (IFTTT + processing)"
-echo "  ✓ depth-gallery.service  — enabled (web gallery)"
-echo "  ✓ depth-monitor.service  — installed (optional, not enabled)"
+if $FRESH_INSTALL; then
+    systemctl enable depth-ring depth-relay depth-gallery
+    echo "  ✓ depth-ring.service     — enabled (ring buffer)"
+    echo "  ✓ depth-relay.service    — enabled (IFTTT + processing)"
+    echo "  ✓ depth-gallery.service  — enabled (web gallery)"
+    echo "  ✓ depth-monitor.service  — installed (optional, not enabled)"
+else
+    # Upgrade: leave enabled/disabled choices alone; restart only what's running.
+    systemctl try-restart depth-ring depth-relay depth-gallery depth-monitor
+    echo "  ✓ Unit files updated; running services restarted"
+    echo ""
+    echo "=========================================="
+    echo "  Upgrade Complete!"
+    echo "=========================================="
+    echo ""
+    sudo -u "$SERVICE_USER" python3 "$INSTALL_DIR/config.py" check | sed 's/^/  /' || true
+    echo ""
+    exit 0
+fi
 
 # ---------------------------------------------------------------------------
 # Summary
@@ -207,6 +255,8 @@ echo ""
 echo "=========================================="
 echo "  Setup Complete!"
 echo "=========================================="
+echo ""
+echo "  Your settings go in $OVERRIDES (defaults: $INSTALL_DIR/config.yaml)."
 echo ""
 echo "  STEP 1 — Set your camera RTSP URL:"
 echo "    sudo nano /etc/depth-camera.env"

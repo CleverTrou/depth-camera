@@ -14,17 +14,14 @@ Flow:
 
 Usage:
     python3 relay.py
-    python3 relay.py --config config.yaml
+    python3 relay.py --config my-settings.yaml   # instead of /etc/depth-camera.yaml
 """
 
 import argparse
 import logging
-import os
 import threading
 import time
 from pathlib import Path
-
-import yaml
 
 try:
     from flask import Flask, request, jsonify
@@ -33,68 +30,9 @@ except ImportError:
     exit(1)
 
 from capture import extract_frame, capture_direct
+from config import load_config, load_defaults
 from notifications import ping_healthcheck, push_ntfy
 from pipeline import process_event
-
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-DEFAULT_CONFIG = {
-    "camera": {
-        "rtsp_url": "rtsp://USER:PASS@CAMERA_IP:8554/stream_path",
-        "rtsp_transport": "tcp",
-    },
-    "ring_buffer": {
-        "dir": "/tmp/depth-ring",
-        "segment_seconds": 2,
-    },
-    "relay": {
-        "host": "::",
-        "port": 9090,
-        "lookback_s": 5,
-        "snapshot_quality": 2,
-    },
-    "pipeline": {
-        "data_dir": "/data/depth-camera",
-        "max_events": 200,
-        "ply_downsample": 2,
-        "depth_input_size": 518,
-        "colormap": "inferno",
-        "camera_hfov_deg": 113.0,
-        "ply_depth_scale": 1.5,
-        "ply_ground_correction": True,
-    },
-    "notifications": {
-        "webhook_heartbeat_url": "",
-        "ntfy_topic_url": "",
-        "heartbeat_interval_s": 43200,  # 12 hours
-    },
-}
-
-
-def load_config(path):
-    config = DEFAULT_CONFIG.copy()
-    if path and Path(path).exists():
-        with open(path) as f:
-            user = yaml.safe_load(f) or {}
-        _deep_merge(config, user)
-    if os.environ.get("CAMERA_RTSP_URL"):
-        config["camera"]["rtsp_url"] = os.environ["CAMERA_RTSP_URL"]
-    if os.environ.get("NTFY_TOPIC_ALERTS"):
-        config["notifications"]["ntfy_topic_url"] = os.environ["NTFY_TOPIC_ALERTS"]
-    if os.environ.get("HEALTHCHECK_WEBHOOK_URL"):
-        config["notifications"]["webhook_heartbeat_url"] = os.environ["HEALTHCHECK_WEBHOOK_URL"]
-    return config
-
-
-def _deep_merge(base, override):
-    for k, v in override.items():
-        if k in base and isinstance(base[k], dict) and isinstance(v, dict):
-            _deep_merge(base[k], v)
-        else:
-            base[k] = v
-
 
 # ---------------------------------------------------------------------------
 # Flask app
@@ -118,7 +56,7 @@ def _get_heartbeat_interval():
     or a typo'd string would otherwise crash the background thread (ValueError/
     TypeError from time.sleep) or spin it at 100% CPU (interval <= 0).
     """
-    default = DEFAULT_CONFIG["notifications"]["heartbeat_interval_s"]
+    default = load_defaults()["notifications"]["heartbeat_interval_s"]
     raw = _config.get("notifications", {}).get("heartbeat_interval_s", default)
     try:
         interval = int(raw)
@@ -294,7 +232,7 @@ def health():
 def main():
     global _config
     parser = argparse.ArgumentParser(description="IFTTT webhook relay")
-    parser.add_argument("--config", "-c", help="Path to YAML config file")
+    parser.add_argument("--config", "-c", help="local settings file layered over config.yaml (default /etc/depth-camera.yaml)")
     args = parser.parse_args()
 
     _config = load_config(args.config)

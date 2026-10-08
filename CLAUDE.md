@@ -45,28 +45,48 @@ for f in *.py; do python3 -c "import py_compile; py_compile.compile('$f', dorais
 
 ## Config
 
-All configuration lives in `config.yaml`. The Python files have inline
-`DEFAULT_CONFIG` dicts that mirror the YAML structure — keep them in sync.
+Three layers, loaded by `config.py` (`load_config()`); later wins:
+
+1. `config.yaml`: the **only** source of defaults, with every key documented.
+   Installed to `/opt/depth-camera/config.yaml` and replaced on every
+   `setup.sh` run. There are no `DEFAULT_CONFIG` dicts in the modules. A new
+   setting goes in `config.yaml`, and code reads `config[section][key]` directly.
+2. `/etc/depth-camera.yaml`: the user's overrides only (0600, owned by the
+   service user). `setup.sh` creates it once and never overwrites it. The
+   gallery Settings page writes it through `config.diff()`, so values equal to
+   the default are dropped instead of frozen.
+3. Env vars, mapped in `config.ENV_OVERRIDES`.
+
+`--config PATH` names the overrides file, not the defaults. Old unit files pass
+`--config config.yaml`, and the loader treats that as "use /etc/depth-camera.yaml"
+with a warning. `python3 config.py check` lists overrides vs defaults and flags
+unknown keys, which the services also warn about at startup.
+
+The live Pi's overrides were migrated on 2026-10-08 from a full-copy
+`/opt/depth-camera/config.yaml`, which is kept as `config.yaml.pre-overrides`.
+Before that, every Settings-page save froze all ten form fields. That's how
+`detection.confirm_frames` stayed at 2 for months after the repo moved to 3.
 
 **Secrets**: Four env-driven values, all loaded via systemd `EnvironmentFile=`.
 The `config.yaml` in the repo has only placeholder values (empty strings for
 the ntfy topic and both healthcheck URLs). Never commit real credentials.
 
 - `CAMERA_RTSP_URL` (camera credentials) — set in `/etc/depth-camera.env` on the
-  Pi (mode 0600 root:root). Override is in `ring_buffer.py`, `relay.py`, `monitor.py`.
+  Pi (mode 0600 root:root).
 - `HEALTHCHECK_RING_BUFFER_URL` (healthchecks.io dead-man's-switch ping URL,
   fired every ~60s while ring-buffer segments are flowing) — set in
-  `/etc/depth-camera.env`. Override is in `ring_buffer.py`.
+  `/etc/depth-camera.env`.
 - `HEALTHCHECK_WEBHOOK_URL` (healthchecks.io URL, pinged on each `/ifttt` POST so
   long quiet periods trigger an alert) — set in `/etc/depth-camera.env`.
-  Override is in `relay.py`.
 - `NTFY_TOPIC_ALERTS` (ntfy push topic for active error alerts) — set in
-  `/etc/ntfy.env` on the Pi (mode 0640 root:trevor). Override is in `relay.py`
-  and `monitor.py`. Same `if os.environ.get(...): config[...] = ...` pattern.
+  `/etc/ntfy.env` on the Pi (mode 0640 root:trevor).
 
-**Deployment**: `setup.sh` installs to `/opt/depth-camera/` and creates systemd
-services that read from there. Each service's unit has both
-`EnvironmentFile=/etc/depth-camera.env` and `EnvironmentFile=/etc/ntfy.env`.
+**Deployment**: `git pull && sudo ./setup.sh` is the upgrade path, not `sudo cp`.
+It replaces code, `config.yaml`, templates and unit files, then runs
+`systemctl try-restart`, leaving enabled/disabled state alone. Ring, relay and
+monitor load `/etc/depth-camera.env` (the gallery needs no secrets). Relay and
+monitor also load `EnvironmentFile=-/etc/ntfy.env` (optional). Local unit tweaks belong in
+`systemctl edit` drop-ins, because edits to the unit files are overwritten.
 IFTTT reaches the Pi via Tailscale Funnel (HTTPS, no port forwarding).
 
 ## Notifications

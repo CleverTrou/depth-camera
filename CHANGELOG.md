@@ -9,7 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `config.py check` lists each of your settings next to the default it
+  replaces, and flags settings that don't exist. The services also log a
+  warning at startup for an unknown setting, so a typo no longer fails silently.
+
+### Changed
+
+- **Breaking:** Your settings now live in `/etc/depth-camera.yaml`, which holds
+  only the values you've changed. Upgrades never touch it. `config.yaml` is now
+  the shipped defaults: upgrades replace it, so new settings and improved
+  defaults reach you unless you've deliberately overridden them. The first
+  `sudo ./setup.sh` after upgrading moves your existing settings over
+  automatically, keeping only the values that differ from the defaults, and
+  saves the old file as `config.yaml.pre-overrides`. `--config` now names your
+  settings file, not the defaults.
+- `git pull && sudo ./setup.sh` is now the upgrade path. Re-running it restarts
+  running services and no longer re-enables services you've disabled.
+- The gallery Settings page saves only the values that differ from the
+  defaults. Previously every save froze all ten fields at their current values,
+  so later default changes never took effect.
+
 ### Fixed
+
+- Re-running `setup.sh` no longer drops the ntfy alert topic from depth-relay
+  and depth-monitor: their units now load `/etc/ntfy.env` when it exists.
+
+### Security
+
+- The gallery PIN is now stored in a file only the service user can read (mode
+  `0600`). The old `config.yaml` was readable by every local user.
 
 - The ring buffer no longer stalls forever when ffmpeg hangs while connecting
   to the camera. ffmpeg now gives up on a silent RTSP connection after

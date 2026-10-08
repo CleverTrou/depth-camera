@@ -9,7 +9,7 @@ Runs on the Pi alongside the ring buffer and relay services.
 
 Usage:
     python3 server.py
-    python3 server.py --config config.yaml
+    python3 server.py --config my-settings.yaml   # instead of /etc/depth-camera.yaml
 """
 
 import argparse
@@ -24,40 +24,15 @@ import threading
 from functools import wraps
 from pathlib import Path
 
-import yaml
 from flask import (
     Flask, jsonify, redirect, render_template,
     request, send_from_directory, session, url_for,
 )
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
-
-DEFAULT_CONFIG = {
-    "gallery": {
-        "host": "::",
-        "port": 8080,
-        "pin": "",
-    },
-    "pipeline": {
-        "data_dir": "/data/depth-camera",
-    },
-}
-
-
-def load_config(path):
-    config = DEFAULT_CONFIG.copy()
-    if path and Path(path).exists():
-        with open(path) as f:
-            user = yaml.safe_load(f) or {}
-        for k, v in user.items():
-            if k in config and isinstance(config[k], dict) and isinstance(v, dict):
-                config[k].update(v)
-            else:
-                config[k] = v
-    return config
-
+from config import (
+    diff, load_config, load_defaults, load_overrides, merge,
+    resolve_overrides_path, save_overrides,
+)
 
 # ---------------------------------------------------------------------------
 # App
@@ -72,7 +47,7 @@ log = logging.getLogger("gallery")
 
 app = Flask(__name__, template_folder=str(Path(__file__).parent / "templates"))
 _config = {}
-_config_path: Path | None = None   # set in main(); used by settings page
+_config_path: Path | None = None   # overrides file; set in main(), written by the settings page
 
 # PLY regeneration state (written by background thread, read by status API)
 _regen_lock = threading.Lock()
@@ -371,24 +346,24 @@ def api_status():
 # Settings
 # ---------------------------------------------------------------------------
 
-def _read_deployed_config() -> dict:
-    """Read the config file the server was started with."""
-    if _config_path and _config_path.exists():
-        with open(_config_path) as f:
-            return yaml.safe_load(f) or {}
-    return {}
+def _effective_config() -> dict:
+    """Defaults plus the overrides file, re-read so a save shows up immediately."""
+    return merge(load_defaults(), load_overrides(_config_path))
 
 
-def _write_deployed_config(raw: dict) -> str | None:
-    """Write config; returns an error string on failure, None on success."""
-    if not _config_path:
-        return "No config file path — start the server with --config."
+def _save_settings(updates: dict) -> str | None:
+    """Fold form values into the overrides file; returns an error string or None.
+
+    Only values that differ from the shipped defaults are written, so a form
+    field left at its default doesn't freeze that default against upgrades.
+    """
+    defaults = load_defaults()
+    effective = merge(merge(defaults, load_overrides(_config_path)), updates)
     try:
-        with open(_config_path, "w") as f:
-            yaml.dump(raw, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        save_overrides(diff(defaults, effective), _config_path)
         return None
     except OSError as e:
-        return f"Could not write config: {e}"
+        return f"Could not write {_config_path}: {e} (run setup.sh to create it)"
 
 
 def _restart_service(name: str) -> bool:
@@ -415,7 +390,7 @@ def settings_page():
     errors = []
 
     if request.method == "POST":
-        raw = _read_deployed_config()
+        raw = {}
 
         def _set(section, key, cast, form_key):
             try:
@@ -440,7 +415,7 @@ def settings_page():
         raw.setdefault("gallery", {})["pin"] = new_pin
 
         if not errors:
-            write_err = _write_deployed_config(raw)
+            write_err = _save_settings(raw)
             if write_err:
                 errors.append(write_err)
             else:
@@ -451,19 +426,20 @@ def settings_page():
                 if not monitor_ok: saved.append("Warning: could not restart depth-monitor.")
                 saved.append("Gallery PIN/config changes take effect after the next manual gallery restart.")
 
-    raw = _read_deployed_config()
+    eff = _effective_config()
+    relay, pipe, det = eff["relay"], eff["pipeline"], eff["detection"]
     current = {
-        "relay_lookback_s":              raw.get("relay", {}).get("lookback_s", 5),
-        "camera_hfov_deg":               raw.get("pipeline", {}).get("camera_hfov_deg", 113.0),
-        "ply_depth_scale":               raw.get("pipeline", {}).get("ply_depth_scale", 1.5),
-        "ply_downsample":                raw.get("pipeline", {}).get("ply_downsample", 2),
-        "ply_ground_correction":         raw.get("pipeline", {}).get("ply_ground_correction", True),
-        "monitor_lookback_s":            raw.get("detection", {}).get("lookback_s", 2),
-        "monitor_min_changed_pct":       raw.get("detection", {}).get("min_changed_pct", 20.0),
-        "monitor_confirm_frames":        raw.get("detection", {}).get("confirm_frames", 3),
-        "monitor_cooldown":              raw.get("detection", {}).get("cooldown", 300),
-        "monitor_diff_display_threshold": raw.get("detection", {}).get("diff_display_threshold", 40),
-        "gallery_pin":                   raw.get("gallery", {}).get("pin", ""),
+        "relay_lookback_s":              relay["lookback_s"],
+        "camera_hfov_deg":               pipe["camera_hfov_deg"],
+        "ply_depth_scale":               pipe["ply_depth_scale"],
+        "ply_downsample":                pipe["ply_downsample"],
+        "ply_ground_correction":         pipe["ply_ground_correction"],
+        "monitor_lookback_s":            det["lookback_s"],
+        "monitor_min_changed_pct":       det["min_changed_pct"],
+        "monitor_confirm_frames":        det["confirm_frames"],
+        "monitor_cooldown":              det["cooldown"],
+        "monitor_diff_display_threshold": det["diff_display_threshold"],
+        "gallery_pin":                   eff["gallery"]["pin"],
         "monitor_active":                _service_active("depth-monitor"),
     }
     # Most recent snapshot + image dimensions for the FOV two-point tool
@@ -553,16 +529,15 @@ def api_regen_ply():
         if _regen_state["running"]:
             return jsonify({"ok": False, "error": "Already running"}), 409
 
-    raw   = _read_deployed_config()
-    pipe  = raw.get("pipeline", {})
+    pipe = _effective_config()["pipeline"]
     t = threading.Thread(
         target=_regen_worker,
         args=(
-            _config.get("pipeline", {}).get("data_dir", "/data/depth-camera"),
-            pipe.get("camera_hfov_deg",     113.0),
-            pipe.get("ply_depth_scale",     1.5),
-            pipe.get("ply_downsample",      2),
-            pipe.get("ply_ground_correction", True),
+            _config["pipeline"]["data_dir"],
+            pipe["camera_hfov_deg"],
+            pipe["ply_depth_scale"],
+            pipe["ply_downsample"],
+            pipe["ply_ground_correction"],
         ),
         daemon=True,
     )
@@ -596,12 +571,12 @@ def api_compute_hfov():
 def main():
     global _config
     parser = argparse.ArgumentParser(description="Depth camera gallery server")
-    parser.add_argument("--config", "-c", help="Path to YAML config file")
+    parser.add_argument("--config", "-c", help="local settings file layered over config.yaml (default /etc/depth-camera.yaml)")
     args = parser.parse_args()
 
     global _config_path
     _config = load_config(args.config)
-    _config_path = Path(args.config) if args.config else None
+    _config_path = resolve_overrides_path(args.config)
 
     gallery_cfg = _config["gallery"]
     data_dir = _config["pipeline"]["data_dir"]
@@ -621,7 +596,7 @@ def main():
     log.info("Depth Camera — Gallery Server")
     log.info(f"  Listening: :{gallery_cfg['port']}")
     log.info(f"  Data dir:  {data_dir}")
-    log.info(f"  PIN auth:  {'enabled' if pin else 'disabled (set gallery.pin in config.yaml)'}")
+    log.info(f"  PIN auth:  {'enabled' if pin else 'disabled (set gallery.pin on the Settings page)'}")
     log.info("=" * 50)
 
     try:

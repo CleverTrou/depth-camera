@@ -121,7 +121,7 @@ Browse to `/settings` (accessible via the ⚙ icon in the gallery header) to con
 - **Gallery** — PIN lock
 - **Regenerate all PLY files** — one button re-runs point cloud generation for all existing events with the current saved settings (progress bar, ~8 min for 200 events)
 
-Settings are written to `/opt/depth-camera/config.yaml`; `depth-relay` and `depth-monitor` restart automatically on save.
+Settings are saved to `/etc/depth-camera.yaml`, and only values that differ from the defaults are kept there (see [Configuration](#configuration)). `depth-relay` and `depth-monitor` restart automatically on save.
 
 ## Output Formats
 
@@ -186,24 +186,21 @@ After starting the services (step 4), open `http://<PI_IP>:8080/settings` and se
 - **Camera FOV** — use the camera database or two-point measurement tool for best point cloud geometry
 - **IFTTT Lookback** — increase if captured frames miss the subject (cloud delay varies)
 
-Or edit `/opt/depth-camera/config.yaml` directly. Key options:
+Or edit `/etc/depth-camera.yaml` directly (`sudo nano /etc/depth-camera.yaml`). It holds only the settings you change, under the same sections as `config.yaml`. For example:
 
 ```yaml
 gallery:
-  pin: "482916"          # 6-character PIN; blank = no lock
+  pin: "482916"              # 6-character PIN; blank = no lock
 
 pipeline:
-  camera_hfov_deg: 113.0     # horizontal FOV — critical for point cloud geometry
-  ply_depth_scale: 1.5       # Z stretch; increase if scene looks flat front-to-back
-  ply_ground_correction: true # RANSAC floor leveling
+  camera_hfov_deg: 108.0     # horizontal FOV — critical for point cloud geometry
+  ply_depth_scale: 2.5       # Z stretch; increase if scene looks flat front-to-back
 
 detection:
-  min_changed_pct: 20.0      # EWMA baseline is p50 ~2%; tune up from the default if too sensitive
-  diff_display_threshold: 40  # orange mask threshold (0 = same as detection)
-  cooldown: 300              # seconds between pi_monitor triggers
+  min_changed_pct: 25.0      # less sensitive than the default 20.0
 ```
 
-Restart after editing: `sudo systemctl restart depth-relay depth-monitor depth-gallery`
+Every available setting, with its default and an explanation, is in `config.yaml`. Restart after editing: `sudo systemctl restart depth-relay depth-monitor depth-gallery`
 
 ### 4. Start services
 
@@ -253,6 +250,32 @@ Note the Funnel URL (e.g., `https://your-hostname.your-tailnet.ts.net`).
 
 Open `http://<PI_IP>:8080/` on your phone or laptop. Try the **Glass** UI mode on a VR headset for passthrough visualization.
 
+## Upgrading
+
+```bash
+cd ~/depth-camera
+git pull
+sudo ./setup.sh
+```
+
+`setup.sh` is both the installer and the upgrade command. Each run replaces the code, templates, shipped defaults (`/opt/depth-camera/config.yaml`) and systemd unit files, then restarts the services that are running. It doesn't change which services are enabled. It never touches:
+
+- `/etc/depth-camera.yaml`: your settings
+- `/etc/depth-camera.env` and `/etc/ntfy.env`: your secrets
+- `/data/depth-camera`: your events
+
+At the end it runs `config.py check`, which lists each of your overrides next to the default it replaces. You can run the check any time:
+
+```bash
+python3 /opt/depth-camera/config.py check
+```
+
+It also flags a setting that doesn't exist, such as a typo or a setting removed in the new version, and an override that now equals the default, which is safe to delete. The services log the same unknown-setting warning at startup.
+
+For local changes to a service's unit, such as a different `MemoryMax`, use `sudo systemctl edit depth-<name>`. The drop-in file it creates survives upgrades, but edits to the unit file itself are replaced.
+
+**Upgrading from a version without `/etc/depth-camera.yaml`:** older versions kept every setting in `/opt/depth-camera/config.yaml`. The first `setup.sh` run after upgrading moves you to the new layout. It keeps the values that differ from the new defaults, writes them to `/etc/depth-camera.yaml`, prints them, and saves the old file as `config.yaml.pre-overrides`. Some of those values may be old defaults rather than choices you made. Delete any you don't want, and the current default applies.
+
 ## Project Structure
 
 ```
@@ -266,8 +289,9 @@ depth-camera/
 ├── monitor.py           # Local motion detection (EWMA background model)
 ├── server.py            # Web gallery + settings page + API
 ├── notifications.py     # ntfy push + healthchecks.io heartbeats
-├── config.yaml          # Configuration reference (secrets via env files)
-├── setup.sh             # One-command Pi setup
+├── config.yaml          # Shipped defaults, documented (your changes go in /etc/depth-camera.yaml)
+├── config.py            # Layered config loader + `check`/`init` CLI
+├── setup.sh             # Install and upgrade (re-run after git pull)
 ├── requirements.txt     # Python dependencies
 └── templates/
     ├── gallery.html     # Event list (5 UI modes, pagination, filters)
@@ -295,6 +319,16 @@ sudo systemctl enable --now depth-monitor
 journalctl -u depth-relay -f
 journalctl -u depth-monitor -f
 ```
+
+## Configuration
+
+Settings load in three layers, and each one overrides the one before:
+
+1. **`/opt/depth-camera/config.yaml`**: the shipped defaults, with every setting documented. Each upgrade replaces this file, so don't edit it.
+2. **`/etc/depth-camera.yaml`**: your changes, and only your changes. The gallery Settings page writes here too, and drops any value that matches the default. Delete a line to go back to the default, including improved defaults from future versions.
+3. **Environment variables**: `CAMERA_RTSP_URL`, `HEALTHCHECK_RING_BUFFER_URL`, `HEALTHCHECK_WEBHOOK_URL` and `NTFY_TOPIC_ALERTS`, set in `/etc/depth-camera.env` and `/etc/ntfy.env`.
+
+`/etc/depth-camera.yaml` is mode `0600` because it can contain the gallery PIN.
 
 ## Configuration Reference
 
@@ -358,13 +392,13 @@ With EWMA, the background absorbs persistent motion (wind, shadows) over ~30s. p
 ## Security Notes
 
 ### Gallery PIN
-The gallery binds to `0.0.0.0:8080` and serves all captured camera images. Without a PIN, anyone on your LAN can browse it. Set `gallery.pin` via the Settings page or directly in `/opt/depth-camera/config.yaml`.
+The gallery binds to `0.0.0.0:8080` and serves all captured camera images. Without a PIN, anyone on your LAN can browse it. Set `gallery.pin` via the Settings page or directly in `/etc/depth-camera.yaml` (mode `0600`, so other local users can't read the PIN).
 
 ### Webhook URL is a shared secret
 The relay endpoint (`/ifttt`) has no per-request authentication — IFTTT's basic webhook doesn't support bearer tokens. Anyone who learns your Tailscale Funnel URL can trigger depth processing. Treat the URL as a secret and use a non-guessable Tailscale hostname.
 
 ### Secrets never touch git
-Camera credentials, healthcheck URLs, and ntfy topics live exclusively in `/etc/depth-camera.env` and `/etc/ntfy.env` on the Pi. `config.yaml` in this repo contains only empty placeholders. The settings page writes to `/opt/depth-camera/config.yaml` (the deployed copy), never to the repo checkout.
+Camera credentials, healthcheck URLs, and ntfy topics live exclusively in `/etc/depth-camera.env` and `/etc/ntfy.env` on the Pi. `config.yaml` in this repo contains only empty placeholders. The settings page writes to `/etc/depth-camera.yaml` on the Pi, never to the repo checkout.
 
 ### Services run as a non-root user
 All systemd services run as the user who invoked `sudo ./setup.sh`. The data directory `/data/depth-camera` is `chown`'d to that user automatically.
