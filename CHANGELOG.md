@@ -37,6 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `sudo ./setup.sh` works on a fresh clone: the script is now marked
+  executable in git, so it no longer fails with "command not found".
 - The ring buffer no longer stalls forever when ffmpeg hangs while connecting
   to the camera. ffmpeg now gives up on a silent RTSP connection after
   `stale_timeout` seconds, and the watchdog restarts it if no segment appears
