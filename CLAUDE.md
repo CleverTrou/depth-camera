@@ -83,9 +83,10 @@ the ntfy topic and both healthcheck URLs). Never commit real credentials.
 
 **Deployment**: `git pull && sudo ./setup.sh` is the upgrade path, not `sudo cp`.
 It replaces code, `config.yaml`, templates and unit files, then runs
-`systemctl try-restart`, leaving enabled/disabled state alone. Ring, relay and
-monitor load `/etc/depth-camera.env` (the gallery needs no secrets). Relay and
-monitor also load `EnvironmentFile=-/etc/ntfy.env` (optional). Local unit tweaks belong in
+`systemctl try-restart`, leaving enabled/disabled state alone. All four units
+load `/etc/depth-camera.env`; the gallery needs `CAMERA_RTSP_URL` for the
+Settings page's RTSP probe. Relay and monitor also load
+`EnvironmentFile=-/etc/ntfy.env` (optional). Local unit tweaks belong in
 `systemctl edit` drop-ins, because edits to the unit files are overwritten.
 IFTTT reaches the Pi via Tailscale Funnel (HTTPS, no port forwarding).
 

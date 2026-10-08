@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Re-running `setup.sh` no longer drops the ntfy alert topic from depth-relay
   and depth-monitor: their units now load `/etc/ntfy.env` when it exists.
   ([#62](https://github.com/CleverTrou/depth-camera/pull/62))
+- The Settings page's **Probe RTSP stream** button works: the gallery service
+  now receives the camera URL from `/etc/depth-camera.env`. It previously only
+  ever saw the placeholder, so it never found a camera.
+  ([#62](https://github.com/CleverTrou/depth-camera/pull/62))
 
 ### Security
 

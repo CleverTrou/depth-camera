@@ -85,7 +85,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # (A config.yaml with the "shipped defaults" banner is already new-style.)
 if [ ! -f "$OVERRIDES" ]; then
     OLD="$INSTALL_DIR/config.yaml"
-    if [ -f "$OLD" ] && ! grep -q "Configuration: shipped defaults" "$OLD"; then
+    if [ -f "$OLD" ] && ! grep -qx "# Depth Camera Configuration: shipped defaults" "$OLD"; then
         cp -p "$OLD" "$OLD.pre-overrides"
         chmod 600 "$OLD.pre-overrides"   # may contain the gallery PIN
         python3 "$SCRIPT_DIR/config.py" init "$OVERRIDES" --from "$OLD.pre-overrides" | sed 's/^/  /'
@@ -196,6 +196,8 @@ After=network-online.target
 Type=simple
 User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
+# CAMERA_RTSP_URL, for the Settings page's "Probe RTSP stream" button.
+EnvironmentFile=/etc/depth-camera.env
 ExecStart=/usr/bin/python3 server.py
 Restart=on-failure
 RestartSec=10
