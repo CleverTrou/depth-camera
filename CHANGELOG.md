@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The ring buffer no longer stalls forever when ffmpeg hangs while connecting
+  to the camera. ffmpeg now gives up on a silent RTSP connection after
+  `stale_timeout` seconds, and the watchdog restarts it if no segment appears
+  within the new `ring_buffer.startup_timeout` (default 30 seconds). Previously
+  a hang like this took the buffer down for five days with no automatic recovery.
+
 ## [0.5.0] - 2026-09-25
 
 ### Added

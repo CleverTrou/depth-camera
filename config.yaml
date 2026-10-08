@@ -20,6 +20,7 @@ ring_buffer:
   segment_seconds: 2
   segment_count: 8           # 8 × 2s = 16 seconds of history
   stale_timeout: 15
+  startup_timeout: 30        # restart ffmpeg if no segment appears this long after launch
   restart_delay: 3
 
 relay:
