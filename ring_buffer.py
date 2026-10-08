@@ -46,6 +46,7 @@ DEFAULT_CONFIG = {
         "segment_seconds": 2,
         "segment_count": 8,
         "stale_timeout": 15,
+        "startup_timeout": 30,
         "restart_delay": 3,
     },
     "notifications": {
@@ -108,6 +109,9 @@ def build_ffmpeg_cmd(config):
         "ffmpeg",
         "-loglevel", "warning",
         "-rtsp_transport", cam["rtsp_transport"],
+        # Socket I/O timeout (µs). Without it ffmpeg blocks forever on a
+        # camera that keeps the TCP session open but stops sending.
+        "-timeout", str(ring["stale_timeout"] * 1_000_000),
         "-i", cam["rtsp_url"],
         "-c", "copy",
         "-an",
@@ -119,12 +123,17 @@ def build_ffmpeg_cmd(config):
     ]
 
 
-def ring_is_healthy(ring_dir, stale_timeout):
+def ring_is_healthy(ring_dir, stale_timeout, since=0.0):
+    """True if a segment written at or after `since` is fresher than stale_timeout.
+
+    Passing the ffmpeg launch time as `since` ignores leftovers from a previous
+    process, which would otherwise look fresh for a few seconds after a restart.
+    """
     segments = list(Path(ring_dir).glob("seg_*.ts"))
     if not segments:
         return False
     newest_mtime = max(seg.stat().st_mtime for seg in segments)
-    return (time.time() - newest_mtime) < stale_timeout
+    return newest_mtime >= since and (time.time() - newest_mtime) < stale_timeout
 
 
 def stop_process(proc):
@@ -183,6 +192,8 @@ def main():
 
         log.info(f"ffmpeg started (pid={proc.pid})")
         startup_grace = True
+        launched_at = time.time()
+        startup_deadline = launched_at + ring["startup_timeout"]
         last_heartbeat = 0.0
 
         while running:
@@ -193,7 +204,7 @@ def main():
                 log.warning(f"ffmpeg exited (code={proc.poll()}): {stderr}")
                 break
 
-            if ring_is_healthy(ring["dir"], ring["stale_timeout"]):
+            if ring_is_healthy(ring["dir"], ring["stale_timeout"], since=launched_at):
                 if startup_grace:
                     log.info("Ring buffer active — segments flowing")
                     startup_grace = False
@@ -203,6 +214,13 @@ def main():
                     last_heartbeat = now
             elif not startup_grace:
                 log.warning("Ring buffer stale — restarting ffmpeg")
+                stop_process(proc)
+                break
+            elif time.time() >= startup_deadline:
+                # Without this, an ffmpeg that hangs before its first segment
+                # stays in the grace period forever (happened Oct 2026: 5 days).
+                log.warning(f"No segments within {ring['startup_timeout']}s of "
+                            "startup — restarting ffmpeg")
                 stop_process(proc)
                 break
 
