@@ -18,6 +18,7 @@ Usage:
 """
 
 import argparse
+import functools
 import logging
 import threading
 import time
@@ -49,6 +50,16 @@ app = Flask(__name__)
 _config = {}
 
 
+@functools.cache
+def _shipped_heartbeat_interval():
+    """The default from config.yaml, read once (main() calls this at startup).
+
+    Re-reading it inside the heartbeat loop could catch setup.sh mid-copy of
+    config.yaml during an upgrade, and a parse error would kill the thread.
+    """
+    return load_defaults()["notifications"]["heartbeat_interval_s"]
+
+
 def _get_heartbeat_interval():
     """Parse notifications.heartbeat_interval_s, falling back to 12h on any bad value.
 
@@ -56,7 +67,7 @@ def _get_heartbeat_interval():
     or a typo'd string would otherwise crash the background thread (ValueError/
     TypeError from time.sleep) or spin it at 100% CPU (interval <= 0).
     """
-    default = load_defaults()["notifications"]["heartbeat_interval_s"]
+    default = _shipped_heartbeat_interval()
     raw = _config.get("notifications", {}).get("heartbeat_interval_s", default)
     try:
         interval = int(raw)

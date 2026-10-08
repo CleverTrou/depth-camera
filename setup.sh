@@ -87,6 +87,7 @@ if [ ! -f "$OVERRIDES" ]; then
     OLD="$INSTALL_DIR/config.yaml"
     if [ -f "$OLD" ] && ! grep -q "Configuration: shipped defaults" "$OLD"; then
         cp -p "$OLD" "$OLD.pre-overrides"
+        chmod 600 "$OLD.pre-overrides"   # may contain the gallery PIN
         python3 "$SCRIPT_DIR/config.py" init "$OVERRIDES" --from "$OLD.pre-overrides" | sed 's/^/  /'
         echo "  ✓ Old settings file kept as $OLD.pre-overrides"
     else

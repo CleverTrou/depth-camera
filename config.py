@@ -70,8 +70,13 @@ def merge(base, override):
     """Return a deep copy of base with override's values layered on top."""
     result = copy.deepcopy(base)
     for k, v in override.items():
-        if isinstance(result.get(k), dict) and isinstance(v, dict):
-            result[k] = merge(result[k], v)
+        if isinstance(result.get(k), dict):
+            if isinstance(v, dict):
+                result[k] = merge(result[k], v)
+            # Otherwise keep the defaults. None is a section whose every key was
+            # deleted (`detection:` alone); replacing the section with it would
+            # crash every service. Other non-mappings are reported by
+            # section_mismatches().
         else:
             result[k] = copy.deepcopy(v)
     return result
@@ -99,6 +104,20 @@ def unknown_keys(defaults, values, prefix=""):
             found.append(path)
         elif isinstance(v, dict) and isinstance(defaults[k], dict):
             found += unknown_keys(defaults[k], v, f"{path}.")
+    return found
+
+
+def section_mismatches(defaults, values, prefix=""):
+    """Dotted paths where defaults have a section but values have something
+    other than a mapping. An empty section (None) is fine and not included."""
+    found = []
+    for k, v in values.items():
+        if not isinstance(defaults.get(k), dict):
+            continue
+        if isinstance(v, dict):
+            found += section_mismatches(defaults[k], v, f"{prefix}{k}.")
+        elif v is not None:
+            found.append(f"{prefix}{k}")
     return found
 
 
@@ -156,6 +175,9 @@ def load_config(path=None):
     for key in unknown_keys(defaults, overrides):
         log.warning(f"Unknown setting '{key}' in {resolve_overrides_path(path)}: "
                     "not a setting in this version (typo, or removed?)")
+    for key in section_mismatches(defaults, overrides):
+        log.warning(f"'{key}' in {resolve_overrides_path(path)} should be a section "
+                    "of settings, not a single value; ignoring it and using the defaults")
     config = merge(defaults, overrides)
     for var, (section, key) in ENV_OVERRIDES.items():
         if os.environ.get(var):
@@ -218,19 +240,25 @@ def _cmd_check(args):
     print(f"Overrides: {path}{'' if path.exists() else ' (not found; using defaults only)'}")
     flat_defaults = _flatten(defaults)
     unknown = set(unknown_keys(defaults, overrides))
+    mismatched = set(section_mismatches(defaults, overrides))
     rows = _flatten(overrides)
     if not rows:
         print("\nNo overrides: every setting is at its default.")
     else:
         print()
         for key, value in rows.items():
+            is_section = any(k.startswith(f"{key}.") for k in flat_defaults)
             if any(key == u or key.startswith(f"{u}.") for u in unknown):
                 print(f"  ! {key} = {value!r}    (unknown setting, ignored by the code)")
+            elif key in mismatched:
+                print(f"  ! {key} = {value!r}    (should be a section of settings; ignored)")
+            elif is_section and value is None:
+                print(f"  = {key}:    (empty section; safe to delete)")
             elif key in flat_defaults and flat_defaults[key] == value:
                 print(f"  = {key} = {value!r}    (same as default; safe to delete)")
             else:
                 print(f"    {key} = {_display(key, value)}    (default {flat_defaults.get(key)!r})")
-    return 1 if unknown else 0
+    return 1 if unknown or mismatched else 0
 
 
 def _cmd_init(args):
