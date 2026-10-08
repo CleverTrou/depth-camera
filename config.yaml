@@ -1,7 +1,12 @@
 # =============================================================================
-# Depth Camera Configuration
+# Depth Camera Configuration: shipped defaults
 # =============================================================================
 # Everything runs on the Pi. No VPS, no cloud compute.
+#
+# Don't edit the installed copy of this file: setup.sh replaces it on every
+# upgrade. Put your changes in /etc/depth-camera.yaml, which holds only the
+# settings you've changed and is layered on top of these defaults. The gallery
+# Settings page writes there too. See "Configuration" in README.md.
 
 camera:
   # RTSP URL is loaded from the environment variable CAMERA_RTSP_URL.
@@ -45,6 +50,7 @@ detection:
   confirm_frames: 3          # was 2; require 9s sustained motion instead of 6s
   lookback_s: 2              # Shorter than IFTTT (local is faster)
   snapshot_quality: 2
+  bg_alpha: 0.9              # background model smoothing (EWMA weight on the old background)
 
 pipeline:
   # Depth processing settings

@@ -16,66 +16,25 @@ Resource usage:
 
 Usage:
     python3 ring_buffer.py
-    python3 ring_buffer.py --config config.yaml
+    python3 ring_buffer.py --config my-settings.yaml   # instead of /etc/depth-camera.yaml
 """
 
 import argparse
 import logging
-import os
 import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-import yaml
-
+from config import load_config
 from notifications import ping_healthcheck
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
-DEFAULT_CONFIG = {
-    "camera": {
-        "rtsp_url": "rtsp://USER:PASS@CAMERA_IP:8554/stream_path",
-        "rtsp_transport": "tcp",
-    },
-    "ring_buffer": {
-        "dir": "/tmp/depth-ring",
-        "segment_seconds": 2,
-        "segment_count": 8,
-        "stale_timeout": 15,
-        "startup_timeout": 30,
-        "restart_delay": 3,
-    },
-    "notifications": {
-        "ring_buffer_heartbeat_url": "",
-    },
-}
-
 HEARTBEAT_INTERVAL_S = 60
-
-
-def load_config(path):
-    config = DEFAULT_CONFIG.copy()
-    if path and Path(path).exists():
-        with open(path) as f:
-            user = yaml.safe_load(f) or {}
-        _deep_merge(config, user)
-    if os.environ.get("CAMERA_RTSP_URL"):
-        config["camera"]["rtsp_url"] = os.environ["CAMERA_RTSP_URL"]
-    if os.environ.get("HEALTHCHECK_RING_BUFFER_URL"):
-        config["notifications"]["ring_buffer_heartbeat_url"] = os.environ["HEALTHCHECK_RING_BUFFER_URL"]
-    return config
-
-
-def _deep_merge(base, override):
-    for k, v in override.items():
-        if k in base and isinstance(base[k], dict) and isinstance(v, dict):
-            _deep_merge(base[k], v)
-        else:
-            base[k] = v
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +115,7 @@ def main():
     global running
 
     parser = argparse.ArgumentParser(description="RTSP ring buffer daemon")
-    parser.add_argument("--config", "-c", help="Path to YAML config file")
+    parser.add_argument("--config", "-c", help="local settings file layered over config.yaml (default /etc/depth-camera.yaml)")
     args = parser.parse_args()
 
     config = load_config(args.config)

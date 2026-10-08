@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `config.py check` lists each of your settings next to the default it
+  replaces, and flags settings that don't exist. The services also log a
+  warning at startup for an unknown setting, so a typo no longer fails silently.
+  ([#62](https://github.com/CleverTrou/depth-camera/pull/62))
+
+### Changed
+
+- **Breaking:** Your settings now live in `/etc/depth-camera.yaml`, which holds
+  only the values you've changed. Upgrades never touch it. `config.yaml` is now
+  the shipped defaults: upgrades replace it, so new settings and improved
+  defaults reach you unless you've deliberately overridden them. The first
+  `sudo ./setup.sh` after upgrading moves your existing settings over
+  automatically, keeping only the values that differ from the defaults, and
+  saves the old file as `config.yaml.pre-overrides`. `--config` now names your
+  settings file, not the defaults.
+  ([#62](https://github.com/CleverTrou/depth-camera/pull/62))
+- `git pull && sudo ./setup.sh` is now the upgrade path. Re-running it restarts
+  running services and no longer re-enables services you've disabled.
+  ([#62](https://github.com/CleverTrou/depth-camera/pull/62))
+- The gallery Settings page saves only the values that differ from the
+  defaults. Previously every save froze all ten fields at their current values,
+  so later default changes never took effect.
+  ([#62](https://github.com/CleverTrou/depth-camera/pull/62))
+
 ### Fixed
 
 - The ring buffer no longer stalls forever when ffmpeg hangs while connecting
@@ -17,6 +43,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   within the new `ring_buffer.startup_timeout` (default 30 seconds). Previously
   a hang like this took the buffer down for five days with no automatic recovery.
   ([#61](https://github.com/CleverTrou/depth-camera/pull/61))
+- Re-running `setup.sh` no longer drops the ntfy alert topic from depth-relay
+  and depth-monitor: their units now load `/etc/ntfy.env` when it exists.
+  ([#62](https://github.com/CleverTrou/depth-camera/pull/62))
+- The Settings page's **Probe RTSP stream** button works: the gallery service
+  now receives the camera URL from `/etc/depth-camera.env`. It previously only
+  ever saw the placeholder, so it never found a camera.
+  ([#62](https://github.com/CleverTrou/depth-camera/pull/62))
+
+### Security
+
+- The gallery PIN is now stored in a file only the service user can read (mode
+  `0600`). The old `config.yaml` was readable by every local user.
+  ([#62](https://github.com/CleverTrou/depth-camera/pull/62))
 
 ## [0.5.0] - 2026-09-25
 
