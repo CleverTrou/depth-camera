@@ -139,7 +139,9 @@ def generate_depth_image(
     output_path = Path(output_path)
 
     depth_16bit = (depth * 65535).astype(np.uint16)
-    Image.fromarray(depth_16bit, mode="I;16").save(str(output_path))
+    # A uint16 array is read as mode "I;16" automatically. Passing mode= here
+    # raises ValueError from Pillow 13 on (deprecated since 11.3).
+    Image.fromarray(depth_16bit).save(str(output_path))
 
     log.info(f"Depth image saved: {output_path.name}")
     return output_path
