@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the `mode` argument the code passed. The saved image is unchanged.
   `requirements.txt` now asks for Pillow 13, onnxruntime 1.32, numpy 2.5.5 and
   matplotlib 3.11.2.
+  ([#69](https://github.com/CleverTrou/depth-camera/pull/69))
 
 - `sudo ./setup.sh` works on a fresh clone: the script is now marked
   executable in git, so it no longer fails with "command not found".
