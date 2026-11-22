@@ -65,7 +65,8 @@ Three layers, loaded by `config.py` (`load_config()`); later wins:
 
 `--config PATH` names the overrides file, not the defaults. Old unit files pass
 `--config config.yaml`, and the loader treats that as "use /etc/depth-camera.yaml"
-with a warning. `python3 config.py check` lists overrides vs defaults and flags
+with a warning. `config.py check` (on the Pi, `/opt/depth-camera/venv/bin/python
+/opt/depth-camera/config.py check`) lists overrides vs defaults and flags
 unknown keys, which the services also warn about at startup.
 
 The live Pi's overrides were migrated on 2026-10-08 from a full-copy
