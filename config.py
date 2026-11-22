@@ -56,7 +56,7 @@ OVERRIDES_HEADER = """\
 # The gallery Settings page also writes this file, and rewrites it without
 # comments. Secrets belong in /etc/depth-camera.env, not here.
 #
-# Check it with:  python3 /opt/depth-camera/config.py check
+# Check it with:  /opt/depth-camera/venv/bin/python /opt/depth-camera/config.py check
 """
 
 log = logging.getLogger("config")

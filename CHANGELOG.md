@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `setup.sh` now installs the Python packages listed in `requirements.txt`, at
+  least at the versions it lists, into their own environment at
+  `/opt/depth-camera/venv`, and the services run from it. Before, it installed
+  the latest of a hard-coded list into the system Python, and copies you'd
+  installed with `pip --user` could take priority, so the services could run
+  older versions than `requirements.txt` required. A failed install now stops
+  setup instead of being skipped silently. The next `sudo ./setup.sh` sets it up
+  (about 300 MB, under a minute on a Pi 5).
+  ([#70](https://github.com/CleverTrou/depth-camera/pull/70))
 - **Breaking:** Your settings now live in `/etc/depth-camera.yaml`, which holds
   only the values you've changed. Upgrades never touch it. `config.yaml` is now
   the shipped defaults: upgrades replace it, so new settings and improved

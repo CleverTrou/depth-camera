@@ -21,6 +21,12 @@ Four systemd services, all on the Pi:
 - **depth-gallery** — Flask web gallery (port 8080), serves events + WebGL viewer
 - **depth-monitor** — optional local motion detection fallback
 
+All four run `/opt/depth-camera/venv/bin/python`, a root-owned venv that
+`setup.sh` builds from `requirements.txt` (rebuilt if `python3`'s minor version
+changes). Don't install the services' packages with system `pip3`: the system
+Python and `~/.local` aren't on their path. Run one-off scripts against the
+install with the venv Python too.
+
 ## Key Design Decisions
 
 - **Ring buffer for timing**: IFTTT notifications arrive 5-7s late. The ring
@@ -59,7 +65,8 @@ Three layers, loaded by `config.py` (`load_config()`); later wins:
 
 `--config PATH` names the overrides file, not the defaults. Old unit files pass
 `--config config.yaml`, and the loader treats that as "use /etc/depth-camera.yaml"
-with a warning. `python3 config.py check` lists overrides vs defaults and flags
+with a warning. `config.py check` (on the Pi, `/opt/depth-camera/venv/bin/python
+/opt/depth-camera/config.py check`) lists overrides vs defaults and flags
 unknown keys, which the services also warn about at startup.
 
 The live Pi's overrides were migrated on 2026-10-08 from a full-copy
