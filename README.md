@@ -137,9 +137,9 @@ Settings are saved to `/etc/depth-camera.yaml`, and only values that differ from
 
 - **Raspberry Pi 5** (8 GB or 16 GB recommended). Pi 4 works but inference is slower.
 - **Aqara G5 Pro** security camera — or any RTSP camera with a supported diagonal FOV in the settings database
-- **Raspberry Pi OS** 64-bit, Bookworm/Trixie
+- **Raspberry Pi OS** 64-bit, Trixie (Debian 13)
 - **ffmpeg 7.x** (installed by setup script; note: ffmpeg < 7.0 uses `nonkey` for `-skip_frame` — 7.0+ uses `nokey`)
-- **Python 3.11+** (ships with Bookworm)
+- **Python 3.12+** (Trixie ships 3.13; Bookworm's 3.11 is too old for the current numpy). `setup.sh` installs the Python packages from `requirements.txt` into their own virtual environment at `/opt/depth-camera/venv`, so they don't mix with the system Python or your own `pip --user` packages
 - **[IFTTT](https://ifttt.com) account** (free tier sufficient) with Aqara Home connected
 
 No GPU, no AI accelerator, no VPS, no cloud compute account needed.
@@ -267,7 +267,7 @@ sudo ./setup.sh
 At the end it runs `config.py check`, which lists each of your overrides next to the default it replaces. You can run the check any time:
 
 ```bash
-python3 /opt/depth-camera/config.py check
+/opt/depth-camera/venv/bin/python /opt/depth-camera/config.py check
 ```
 
 It also flags a setting that doesn't exist, such as a typo or a setting removed in the new version, and an override that now equals the default, which is safe to delete. The services log the same unknown-setting warning at startup.
@@ -292,7 +292,7 @@ depth-camera/
 ├── config.yaml          # Shipped defaults, documented (your changes go in /etc/depth-camera.yaml)
 ├── config.py            # Layered config loader + `check`/`init` CLI
 ├── setup.sh             # Install and upgrade (re-run after git pull)
-├── requirements.txt     # Python dependencies
+├── requirements.txt     # Python dependencies (setup.sh installs them into /opt/depth-camera/venv)
 └── templates/
     ├── gallery.html     # Event list (5 UI modes, pagination, filters)
     ├── viewer.html      # Parallax / Depth / Cloud / XR / Diff viewer

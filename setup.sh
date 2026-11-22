@@ -62,21 +62,40 @@ echo "  ✓ System packages"
 # ---------------------------------------------------------------------------
 echo ""
 echo "[2/5] Installing Python packages..."
-pip3 install --break-system-packages -q \
-    flask pyyaml requests onnxruntime numpy Pillow matplotlib 2>/dev/null \
-    || pip3 install -q flask pyyaml requests onnxruntime numpy Pillow matplotlib
-echo "  ✓ Python packages (including onnxruntime for ARM64)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="/opt/depth-camera"
+# The services run from their own virtual environment, built from
+# requirements.txt. It keeps them clear of the system Python, which Debian
+# marks as externally managed (PEP 668), and of the service user's
+# ~/.local packages, which a venv ignores. Root owns it; the services only read it.
+VENV="$INSTALL_DIR/venv"
+PY="$VENV/bin/python"
+mkdir -p "$INSTALL_DIR"
+PY_MM=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+# requirements.txt's floors (numpy 2.5 and up) need Python 3.12+.
+if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 12))'; then
+    echo "  ✗ Python 3.12 or newer is required (Raspberry Pi OS Trixie); this is $PY_MM."
+    exit 1
+fi
+# A venv only works with the Python minor version that created it, so rebuild
+# it after an OS upgrade moves python3 to a new one (e.g. 3.13 -> 3.14).
+if [ -f "$VENV/pyvenv.cfg" ] && ! grep -qE "^version(_info)? = ${PY_MM//./\\.}\." "$VENV/pyvenv.cfg"; then
+    echo "  Python is now $PY_MM: rebuilding $VENV"
+    rm -rf "$VENV"
+fi
+[ -x "$PY" ] || python3 -m venv "$VENV"
+# Floors only: a package that already meets its requirement is left alone, so
+# a re-run upgrades just what requirements.txt now asks for.
+"$PY" -m pip install -q --disable-pip-version-check -r "$SCRIPT_DIR/requirements.txt"
+echo "  ✓ Python packages from requirements.txt in $VENV"
 
 # ---------------------------------------------------------------------------
 # 3. Application files
 # ---------------------------------------------------------------------------
 echo ""
 echo "[3/5] Installing application..."
-INSTALL_DIR="/opt/depth-camera"
 OVERRIDES="/etc/depth-camera.yaml"
 mkdir -p "$INSTALL_DIR/templates"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Your settings live in $OVERRIDES, which this script creates once and never
 # overwrites. Versions before it kept every setting in $INSTALL_DIR/config.yaml.
@@ -88,10 +107,10 @@ if [ ! -f "$OVERRIDES" ]; then
     if [ -f "$OLD" ] && ! grep -qx "# Depth Camera Configuration: shipped defaults" "$OLD"; then
         cp -p "$OLD" "$OLD.pre-overrides"
         chmod 600 "$OLD.pre-overrides"   # may contain the gallery PIN
-        python3 "$SCRIPT_DIR/config.py" init "$OVERRIDES" --from "$OLD.pre-overrides" | sed 's/^/  /'
+        "$PY" "$SCRIPT_DIR/config.py" init "$OVERRIDES" --from "$OLD.pre-overrides" | sed 's/^/  /'
         echo "  ✓ Old settings file kept as $OLD.pre-overrides"
     else
-        python3 "$SCRIPT_DIR/config.py" init "$OVERRIDES" | sed 's/^/  /'
+        "$PY" "$SCRIPT_DIR/config.py" init "$OVERRIDES" | sed 's/^/  /'
     fi
     # 0600: it can hold the gallery PIN. Owned by the service user so the
     # gallery Settings page can write it.
@@ -155,7 +174,7 @@ Type=simple
 User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
 EnvironmentFile=/etc/depth-camera.env
-ExecStart=/usr/bin/python3 ring_buffer.py
+ExecStart=$PY ring_buffer.py
 Restart=always
 RestartSec=5
 MemoryMax=100M
@@ -177,7 +196,7 @@ User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
 EnvironmentFile=/etc/depth-camera.env
 EnvironmentFile=-/etc/ntfy.env
-ExecStart=/usr/bin/python3 relay.py
+ExecStart=$PY relay.py
 Restart=on-failure
 RestartSec=15
 MemoryMax=2G
@@ -198,7 +217,7 @@ User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
 # CAMERA_RTSP_URL, for the Settings page's "Probe RTSP stream" button.
 EnvironmentFile=/etc/depth-camera.env
-ExecStart=/usr/bin/python3 server.py
+ExecStart=$PY server.py
 Restart=on-failure
 RestartSec=10
 MemoryMax=200M
@@ -220,7 +239,7 @@ User=$SERVICE_USER
 WorkingDirectory=/opt/depth-camera
 EnvironmentFile=/etc/depth-camera.env
 EnvironmentFile=-/etc/ntfy.env
-ExecStart=/usr/bin/python3 monitor.py
+ExecStart=$PY monitor.py
 Restart=on-failure
 RestartSec=15
 MemoryMax=2G
@@ -246,7 +265,7 @@ else
     echo "  Upgrade Complete!"
     echo "=========================================="
     echo ""
-    sudo -u "$SERVICE_USER" python3 "$INSTALL_DIR/config.py" check | sed 's/^/  /' || true
+    sudo -u "$SERVICE_USER" "$PY" "$INSTALL_DIR/config.py" check | sed 's/^/  /' || true
     echo ""
     exit 0
 fi

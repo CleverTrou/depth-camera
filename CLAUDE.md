@@ -21,6 +21,12 @@ Four systemd services, all on the Pi:
 - **depth-gallery** — Flask web gallery (port 8080), serves events + WebGL viewer
 - **depth-monitor** — optional local motion detection fallback
 
+All four run `/opt/depth-camera/venv/bin/python`, a root-owned venv that
+`setup.sh` builds from `requirements.txt` (rebuilt if `python3`'s minor version
+changes). Don't install the services' packages with system `pip3`: the system
+Python and `~/.local` aren't on their path. Run one-off scripts against the
+install with the venv Python too.
+
 ## Key Design Decisions
 
 - **Ring buffer for timing**: IFTTT notifications arrive 5-7s late. The ring
